@@ -8,7 +8,7 @@
     <form method="POST" class="inline-form">
         <div>
             <label>Data</label>
-            <input type="date" name="data" required>
+            <input type="text" class="date-br" name="data" required>
         </div>
         <div class="grow">
             <label>Descrição</label>
@@ -29,7 +29,7 @@
         <tbody>
         {% for r in registros %}
             <tr>
-                <td>{{ r.data }}</td>
+                <td>{{ r.data|data_br }}</td>
                 <td>{{ r.descricao }}</td>
                 <td>R$ {{ "%.2f"|format(r.valor)|replace(".", ",") }}</td>
                 <td>

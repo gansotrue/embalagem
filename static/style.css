@@ -55,40 +55,45 @@ html.dark .flash-error { background: #7f1d1d; color: #fecaca; }
     display: flex;
     align-items: center;
     justify-content: center;
-    background: linear-gradient(135deg, #1e3a8a, #3b82f6);
+    background: #0a0f1f;
+    background-image: radial-gradient(circle at 20% 20%, #10192f 0%, #0a0f1f 55%);
 }
 .login-card {
-    background: var(--card);
-    padding: 40px;
-    border-radius: 16px;
-    box-shadow: 0 20px 50px rgba(0,0,0,0.2);
-    width: 360px;
-    text-align: center;
+    background: #111a30;
+    padding: 44px 40px;
+    border-radius: 14px;
+    box-shadow: 0 25px 60px rgba(0,0,0,0.45);
+    border: 1px solid #1e2a45;
+    width: 340px;
+    text-align: left;
 }
-.login-icon { font-size: 42px; }
-.login-card h1 { font-size: 20px; margin: 10px 0 4px; }
-.subtitle { color: var(--text-light); margin-bottom: 20px; font-size: 14px; }
-.login-card form { display: flex; flex-direction: column; gap: 6px; text-align: left; }
-.login-card label { font-size: 13px; font-weight: 600; margin-top: 8px; }
+.login-card h1 { font-size: 19px; margin: 0 0 6px; color: #e8ecf5; font-weight: 600; letter-spacing: 0.2px; }
+.subtitle { color: #7c88a3; margin: 0 0 26px; font-size: 13px; }
+.login-card form { display: flex; flex-direction: column; gap: 6px; }
+.login-card label { font-size: 12px; font-weight: 600; margin-top: 10px; color: #9aa5bd; text-transform: uppercase; letter-spacing: 0.4px; }
 .login-card input {
-    padding: 10px 12px;
+    padding: 11px 12px;
     border-radius: 8px;
-    border: 1px solid var(--border);
+    border: 1px solid #253256;
+    background: #0c1426;
+    color: #e8ecf5;
     font-size: 14px;
 }
+.login-card input:focus { outline: none; border-color: #3b82f6; }
 .login-card button {
-    margin-top: 18px;
+    margin-top: 22px;
     padding: 12px;
     border: none;
-    background: var(--blue);
+    background: #2563eb;
     color: white;
     font-weight: 600;
     border-radius: 8px;
     cursor: pointer;
-    font-size: 15px;
+    font-size: 14px;
+    letter-spacing: 0.3px;
 }
-.login-card button:hover { background: #2563eb; }
-.hint { margin-top: 16px; font-size: 12px; color: var(--text-light); }
+.login-card button:hover { background: #1d4ed8; }
+.login-card .flash { font-size: 13px; }
 
 /* ---------- LAYOUT ---------- */
 .app-shell { display: flex; min-height: 100vh; }
@@ -206,8 +211,20 @@ table { width: 100%; border-collapse: collapse; font-size: 14px; }
 th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--border); }
 th { color: var(--text-light); font-weight: 600; font-size: 12px; text-transform: uppercase; }
 .empty { text-align: center; color: var(--text-light); padding: 20px; }
+.acoes { display: flex; gap: 8px; align-items: center; }
 .btn-delete { background: transparent; border: 1px solid var(--red); color: var(--red); padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; }
 .btn-delete:hover { background: var(--red); color: white; }
+.btn-edit { background: transparent; border: 1px solid var(--blue); color: var(--blue); padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; text-decoration: none; white-space: nowrap; }
+.btn-edit:hover { background: var(--blue); color: white; }
+.btn-cancel { padding: 10px 18px; border: 1px solid var(--border); color: var(--text); border-radius: 8px; font-weight: 600; text-decoration: none; font-size: 14px; display: inline-flex; align-items: center; }
+.btn-cancel:hover { background: var(--bg); }
+
+/* flatpickr no tema escuro */
+html.dark .flatpickr-calendar { background: #171e2e; box-shadow: 0 3px 13px rgba(0,0,0,0.5); }
+html.dark .flatpickr-day { color: #e5e7eb; }
+html.dark .flatpickr-day.flatpickr-disabled, html.dark .flatpickr-day.prevMonthDay, html.dark .flatpickr-day.nextMonthDay { color: #4b5563; }
+html.dark .flatpickr-months, html.dark .flatpickr-weekday { background: #171e2e; color: #e5e7eb; }
+html.dark .flatpickr-current-month input.cur-year { color: #e5e7eb; }
 
 .hint-block { color: var(--text-light); font-size: 14px; margin-bottom: 16px; max-width: 700px; }
 

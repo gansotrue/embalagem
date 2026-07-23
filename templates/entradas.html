@@ -9,7 +9,7 @@
     <form method="POST" class="inline-form">
         <div>
             <label>Data</label>
-            <input type="date" name="data" required>
+            <input type="text" class="date-br" name="data" required>
         </div>
         <div>
             <label>Fornecedor</label>
@@ -49,13 +49,14 @@
         <tbody>
         {% for r in registros %}
             <tr>
-                <td>{{ r.data }}</td>
+                <td>{{ r.data|data_br }}</td>
                 <td>{{ FORNECEDOR_LABEL.get(r.fornecedor, r.fornecedor) }}</td>
                 <td>{{ r.cm }} cm</td>
                 <td>{{ r.qtd_fardos }}</td>
                 <td>{{ r.obs or '-' }}</td>
                 {% if is_admin() %}
-                <td>
+                <td class="acoes">
+                    <a href="{{ url_for('editar_entrada', id=r.id) }}" class="btn-edit">Editar</a>
                     <form method="POST" action="{{ url_for('excluir_entrada', id=r.id) }}" onsubmit="return confirm('Excluir este registro?');">
                         <button type="submit" class="btn-delete">Excluir</button>
                     </form>

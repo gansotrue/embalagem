@@ -184,9 +184,18 @@ def pode_lancar():
     return session.get("role") in ("admin", "funcionario")
 
 
+def formatar_data_br(iso_str):
+    """Converte 'YYYY-MM-DD' para 'DD/MM/YYYY' para exibição."""
+    try:
+        return datetime.strptime(iso_str, "%Y-%m-%d").strftime("%d/%m/%Y")
+    except (TypeError, ValueError):
+        return iso_str or "-"
+
+
 app.jinja_env.globals["is_admin"] = is_admin
 app.jinja_env.globals["pode_lancar"] = pode_lancar
 app.jinja_env.globals["FORNECEDOR_LABEL"] = FORNECEDOR_LABEL
+app.jinja_env.filters["data_br"] = formatar_data_br
 
 
 @app.route("/login", methods=["GET", "POST"])
@@ -406,6 +415,31 @@ def excluir_entrada(id):
     return redirect(url_for("entradas"))
 
 
+@app.route("/entradas/editar/<int:id>", methods=["GET", "POST"])
+@role_required("admin")
+def editar_entrada(id):
+    db = Session()
+    reg = db.query(Entrada).get(id)
+    if not reg:
+        flash("Registro não encontrado.", "error")
+        return redirect(url_for("entradas"))
+
+    if request.method == "POST":
+        reg.data = request.form.get("data") or reg.data
+        reg.cm = int(request.form.get("cm"))
+        reg.fornecedor = request.form.get("fornecedor", "texpharma")
+        reg.qtd_fardos = int(request.form.get("qtd_fardos"))
+        reg.obs = request.form.get("obs", "")
+        db.commit()
+        flash("Entrada atualizada com sucesso!", "success")
+        return redirect(url_for("entradas"))
+
+    cms = sorted({r.cm for r in db.query(CmConfig).all()})
+    return render_template("editar_registro.html", registro=reg, cms=cms, fornecedores=FORNECEDORES,
+                            voltar_url=url_for("entradas"), salvar_url=url_for("editar_entrada", id=id),
+                            titulo="Editar entrada")
+
+
 # ---------------------------------------------------------------------------
 # SAÍDAS (fardos entregues / produzidos)
 # ---------------------------------------------------------------------------
@@ -443,6 +477,31 @@ def excluir_saida(id):
         db.commit()
     flash("Registro excluído.", "success")
     return redirect(url_for("saidas"))
+
+
+@app.route("/saidas/editar/<int:id>", methods=["GET", "POST"])
+@role_required("admin")
+def editar_saida(id):
+    db = Session()
+    reg = db.query(Saida).get(id)
+    if not reg:
+        flash("Registro não encontrado.", "error")
+        return redirect(url_for("saidas"))
+
+    if request.method == "POST":
+        reg.data = request.form.get("data") or reg.data
+        reg.cm = int(request.form.get("cm"))
+        reg.fornecedor = request.form.get("fornecedor", "texpharma")
+        reg.qtd_fardos = int(request.form.get("qtd_fardos"))
+        reg.obs = request.form.get("obs", "")
+        db.commit()
+        flash("Saída atualizada com sucesso!", "success")
+        return redirect(url_for("saidas"))
+
+    cms = sorted({r.cm for r in db.query(CmConfig).all()})
+    return render_template("editar_registro.html", registro=reg, cms=cms, fornecedores=FORNECEDORES,
+                            voltar_url=url_for("saidas"), salvar_url=url_for("editar_saida", id=id),
+                            titulo="Editar saída")
 
 
 # ---------------------------------------------------------------------------

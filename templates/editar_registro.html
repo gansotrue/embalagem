@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}{{ titulo }}{% endblock %}
+{% block content %}
+<div class="page-header"><h1>✏️ {{ titulo }}</h1></div>
+
+<div class="form-card" style="max-width: 520px;">
+    <form method="POST" class="stacked-form">
+        <label>Data</label>
+        <input type="text" class="date-br" name="data" value="{{ registro.data }}" required>
+
+        <label>Fornecedor</label>
+        <div class="radio-group">
+            {% for f in fornecedores %}
+            <label class="radio-option"><input type="radio" name="fornecedor" value="{{ f }}" {{ 'checked' if registro.fornecedor == f }}> {{ FORNECEDOR_LABEL.get(f, f) }}</label>
+            {% endfor %}
+        </div>
+
+        <label>Espessura (cm)</label>
+        <select name="cm" required>
+            {% for cm in cms %}
+            <option value="{{ cm }}" {{ 'selected' if cm == registro.cm }}>{{ cm }} cm</option>
+            {% endfor %}
+        </select>
+
+        <label>Qtd. de fardos</label>
+        <input type="number" name="qtd_fardos" min="1" value="{{ registro.qtd_fardos }}" required>
+
+        <label>Observação (opcional)</label>
+        <input type="text" name="obs" value="{{ registro.obs or '' }}">
+
+        <div style="display:flex; gap:10px; margin-top:18px;">
+            <button type="submit">Salvar alterações</button>
+            <a href="{{ voltar_url }}" class="btn-cancel">Cancelar</a>
+        </div>
+    </form>
+</div>
+{% endblock %}
