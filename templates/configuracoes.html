@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Configurações{% endblock %}
+{% block content %}
+<div class="page-header"><h1>⚙️ Configuração de valores por espessura e fornecedor</h1></div>
+
+<p class="hint-block">
+    Para cada fornecedor e espessura, defina quantos sacos (pacotes de 12 unidades) cabem em um fardo
+    e quanto você recebe por pacote. O valor do fardo é calculado automaticamente.
+</p>
+
+<div class="table-card">
+    <h3>Texpharma</h3>
+    <table>
+        <thead>
+            <tr><th>Espessura</th><th>Sacos por fardo</th><th>Valor por pacote (R$)</th><th>Valor do fardo (R$)</th><th></th></tr>
+        </thead>
+        <tbody>
+        {% for c in configs_texpharma %}
+            <tr>
+                <form method="POST">
+                    <td>{{ c.cm }} cm <input type="hidden" name="id" value="{{ c.id }}"></td>
+                    <td><input type="number" name="sacos_por_fardo" value="{{ c.sacos_por_fardo }}" min="0" required></td>
+                    <td><input type="number" step="0.01" name="valor_pacote" value="{{ c.valor_pacote }}" min="0" required></td>
+                    <td>R$ {{ "%.2f"|format(c.valor_fardo)|replace(".", ",") }}</td>
+                    <td><button type="submit">Salvar</button></td>
+                </form>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="table-card">
+    <h3>Letícia</h3>
+    <table>
+        <thead>
+            <tr><th>Espessura</th><th>Sacos por fardo</th><th>Valor por pacote (R$)</th><th>Valor do fardo (R$)</th><th></th></tr>
+        </thead>
+        <tbody>
+        {% for c in configs_leticia %}
+            <tr>
+                <form method="POST">
+                    <td>{{ c.cm }} cm <input type="hidden" name="id" value="{{ c.id }}"></td>
+                    <td><input type="number" name="sacos_por_fardo" value="{{ c.sacos_por_fardo }}" min="0" required></td>
+                    <td><input type="number" step="0.01" name="valor_pacote" value="{{ c.valor_pacote }}" min="0" required></td>
+                    <td>R$ {{ "%.2f"|format(c.valor_fardo)|replace(".", ",") }}</td>
+                    <td><button type="submit">Salvar</button></td>
+                </form>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="form-card">
+    <h3>Adicionar nova espessura</h3>
+    <form method="GET" class="inline-form">
+        <div>
+            <label>Espessura (cm)</label>
+            <input type="number" name="novo_cm" min="1" required>
+        </div>
+        <div>
+            <label>Fornecedor</label>
+            <div class="radio-group">
+                <label class="radio-option"><input type="radio" name="novo_fornecedor" value="texpharma" checked> Texpharma</label>
+                <label class="radio-option"><input type="radio" name="novo_fornecedor" value="leticia"> Letícia</label>
+            </div>
+        </div>
+        <button type="submit">Adicionar</button>
+    </form>
+</div>
+{% endblock %}

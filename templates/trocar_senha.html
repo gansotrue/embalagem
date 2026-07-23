@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Trocar senha{% endblock %}
+{% block content %}
+<div class="page-header"><h1>🔑 Trocar senha</h1></div>
+<div class="form-card" style="max-width:420px;">
+    <form method="POST" class="stacked-form">
+        <label>Senha atual</label>
+        <input type="password" name="senha_atual" required>
+        <label>Nova senha</label>
+        <input type="password" name="nova_senha" required minlength="4">
+        <button type="submit">Atualizar senha</button>
+    </form>
+</div>
+{% endblock %}

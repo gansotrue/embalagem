@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Sistema{% endblock %} · Embalagem de Ataduras</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script>
+        // aplica o tema salvo antes da página renderizar, pra não piscar
+        (function() {
+            const tema = localStorage.getItem('tema') || 'claro';
+            if (tema === 'escuro') document.documentElement.classList.add('dark');
+        })();
+    </script>
+</head>
+<body>
+    {% if session.get('user_id') %}
+    <div class="app-shell">
+        <aside class="sidebar">
+            <div class="brand">
+                <span class="brand-icon">🩹</span>
+                <span class="brand-name">Ataduras<br>Embalagem</span>
+            </div>
+            <nav>
+                <a href="{{ url_for('dashboard') }}" class="{{ 'active' if request.endpoint == 'dashboard' }}">📊 Dashboard</a>
+                <a href="{{ url_for('entradas') }}" class="{{ 'active' if request.endpoint == 'entradas' }}">📥 Entradas</a>
+                <a href="{{ url_for('saidas') }}" class="{{ 'active' if request.endpoint == 'saidas' }}">📤 Saídas</a>
+                {% if is_admin() %}
+                <a href="{{ url_for('despesas') }}" class="{{ 'active' if request.endpoint == 'despesas' }}">💸 Despesas</a>
+                {% endif %}
+                {% if is_admin() or session.get('role') == 'texpharma' %}
+                <a href="{{ url_for('relatorios') }}" class="{{ 'active' if request.endpoint in ['relatorios','gerar_relatorio'] }}">🧾 Relatórios</a>
+                {% endif %}
+                {% if is_admin() %}
+                <a href="{{ url_for('configuracoes') }}" class="{{ 'active' if request.endpoint == 'configuracoes' }}">⚙️ Configurações</a>
+                {% endif %}
+            </nav>
+            <div class="sidebar-footer">
+                <span>Olá, {{ session.get('username') }}
+                    {% if session.get('role') == 'texpharma' %}<br><small>(visualização)</small>
+                    {% elif session.get('role') == 'funcionario' %}<br><small>(funcionário)</small>
+                    {% endif %}
+                </span>
+                <button type="button" id="toggle-tema" class="theme-toggle">🌙 Tema escuro</button>
+                <a href="{{ url_for('trocar_senha') }}">Trocar senha</a>
+                <a href="{{ url_for('logout') }}">Sair</a>
+            </div>
+        </aside>
+        <main class="content">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    <div class="flash-container">
+                    {% for category, message in messages %}
+                        <div class="flash flash-{{ category }}">{{ message }}</div>
+                    {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+    {% else %}
+        {% block content_public %}{% endblock %}
+    {% endif %}
+    <script>
+        const btnTema = document.getElementById('toggle-tema');
+        function atualizarLabel() {
+            if (!btnTema) return;
+            const escuro = document.documentElement.classList.contains('dark');
+            btnTema.textContent = escuro ? '☀️ Tema claro' : '🌙 Tema escuro';
+        }
+        if (btnTema) {
+            atualizarLabel();
+            btnTema.addEventListener('click', function() {
+                document.documentElement.classList.toggle('dark');
+                const escuro = document.documentElement.classList.contains('dark');
+                localStorage.setItem('tema', escuro ? 'escuro' : 'claro');
+                atualizarLabel();
+            });
+        }
+    </script>
+</body>
+</html>

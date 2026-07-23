@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+
+<div class="page-header">
+    <h1>Dashboard</h1>
+    <form class="month-filter" method="GET">
+        <select name="mes">
+            {% for i, nome in [(1,'Janeiro'),(2,'Fevereiro'),(3,'Março'),(4,'Abril'),(5,'Maio'),(6,'Junho'),(7,'Julho'),(8,'Agosto'),(9,'Setembro'),(10,'Outubro'),(11,'Novembro'),(12,'Dezembro')] %}
+                <option value="{{ i }}" {{ 'selected' if i == mes }}>{{ nome }}</option>
+            {% endfor %}
+        </select>
+        <select name="ano">
+            {% for a in range(hoje.year - 2, hoje.year + 1) %}
+                <option value="{{ a }}" {{ 'selected' if a == ano }}>{{ a }}</option>
+            {% endfor %}
+        </select>
+        <button type="submit">Filtrar</button>
+    </form>
+</div>
+
+<p class="period-label">Exibindo dados de <b>{{ mes_nome }} / {{ ano }}</b></p>
+
+<div class="kpi-grid">
+    {% if is_admin() %}
+    <div class="kpi-card kpi-blue">
+        <span class="kpi-label">Faturamento do mês</span>
+        <span class="kpi-value">R$ {{ "%.2f"|format(faturamento_mes)|replace(".", ",") }}</span>
+    </div>
+    <div class="kpi-card kpi-red">
+        <span class="kpi-label">Despesas do mês</span>
+        <span class="kpi-value">R$ {{ "%.2f"|format(total_despesas)|replace(".", ",") }}</span>
+    </div>
+    <div class="kpi-card kpi-green">
+        <span class="kpi-label">Lucro do mês</span>
+        <span class="kpi-value">R$ {{ "%.2f"|format(lucro_mes)|replace(".", ",") }}</span>
+    </div>
+    {% endif %}
+    <div class="kpi-card kpi-purple">
+        <span class="kpi-label">Fardos entregues (saída)</span>
+        <span class="kpi-value">{{ total_fardos_saida }}</span>
+    </div>
+    <div class="kpi-card kpi-orange">
+        <span class="kpi-label">Fardos recebidos (entrada)</span>
+        <span class="kpi-value">{{ total_fardos_entrada }}</span>
+    </div>
+</div>
+
+<div class="averages-grid">
+    <div class="avg-card">
+        <h3>Média diária</h3>
+        <p>{{ media_diaria_fardos }} fardos/dia</p>
+        {% if is_admin() %}<p>R$ {{ "%.2f"|format(media_diaria_faturamento)|replace(".", ",") }} /dia</p>{% endif %}
+    </div>
+    <div class="avg-card">
+        <h3>Média semanal</h3>
+        <p>{{ media_semanal_fardos }} fardos/semana</p>
+        {% if is_admin() %}<p>R$ {{ "%.2f"|format(media_semanal_faturamento)|replace(".", ",") }} /semana</p>{% endif %}
+    </div>
+    <div class="avg-card">
+        <h3>Média mensal (projeção)</h3>
+        <p>{{ total_fardos_saida }} fardos no mês</p>
+        {% if is_admin() %}<p>R$ {{ "%.2f"|format(faturamento_mes)|replace(".", ",") }} /mês</p>{% endif %}
+    </div>
+</div>
+
+<div class="charts-grid">
+    {% if is_admin() %}
+    <div class="chart-card">
+        <h3>Faturamento diário (R$)</h3>
+        <canvas id="chartFaturamento"></canvas>
+    </div>
+    {% endif %}
+    <div class="chart-card">
+        <h3>Fardos por dia — Entrada vs Saída</h3>
+        <canvas id="chartFardos"></canvas>
+    </div>
+</div>
+
+<div class="table-card">
+    <h3>Resumo por espessura {{ 'e faturamento' if is_admin() else '' }} no mês</h3>
+    <table>
+        <thead>
+            <tr><th>Espessura</th><th>Fornecedor</th><th>Fardos entregues</th>{% if is_admin() %}<th>Faturamento</th>{% endif %}</tr>
+        </thead>
+        <tbody>
+            {% for item in breakdown_list %}
+            <tr>
+                <td>{{ item.cm }} cm</td>
+                <td>{{ FORNECEDOR_LABEL.get(item.fornecedor, item.fornecedor) }}</td>
+                <td>{{ item.fardos }}</td>
+                {% if is_admin() %}<td>R$ {{ "%.2f"|format(item.faturamento)|replace(".", ",") }}</td>{% endif %}
+            </tr>
+            {% else %}
+            <tr><td colspan="4" class="empty">Nenhuma saída registrada neste mês.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script>
+const labels = {{ dias_labels|tojson }};
+const fardosSaida = {{ dias_fardos_saida|tojson }};
+const fardosEntrada = {{ dias_fardos_entrada|tojson }};
+
+{% if is_admin() %}
+const faturamento = {{ dias_faturamento|tojson }};
+new Chart(document.getElementById('chartFaturamento'), {
+    type: 'bar',
+    data: {
+        labels: labels,
+        datasets: [{
+            label: 'Faturamento (R$)',
+            data: faturamento,
+            backgroundColor: '#3b82f6'
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true } }
+    }
+});
+{% endif %}
+
+new Chart(document.getElementById('chartFardos'), {
+    type: 'line',
+    data: {
+        labels: labels,
+        datasets: [
+            {
+                label: 'Fardos recebidos',
+                data: fardosEntrada,
+                borderColor: '#f97316',
+                backgroundColor: 'rgba(249,115,22,0.15)',
+                tension: 0.3,
+                fill: true
+            },
+            {
+                label: 'Fardos entregues',
+                data: fardosSaida,
+                borderColor: '#8b5cf6',
+                backgroundColor: 'rgba(139,92,246,0.15)',
+                tension: 0.3,
+                fill: true
+            }
+        ]
+    },
+    options: {
+        responsive: true,
+        scales: { y: { beginAtZero: true } }
+    }
+});
+</script>
+{% endblock %}

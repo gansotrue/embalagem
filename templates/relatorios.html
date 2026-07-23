@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Relatórios{% endblock %}
+{% block content %}
+<div class="page-header"><h1>🧾 Relatórios em PDF</h1></div>
+<p class="hint-block">Gere um extrato em PDF com o resumo do período escolhido. Escolha o tipo de relatório e o período.</p>
+
+<div class="form-card">
+    <form method="GET" action="{{ url_for('gerar_relatorio') }}" id="form-relatorio" class="stacked-form">
+        <label>Tipo de relatório</label>
+        <div class="radio-group">
+            <label class="radio-option"><input type="radio" name="tipo" value="logistico" checked> Resumo Logístico (fardos: entrada x saída)</label>
+            {% if is_admin() %}
+            <label class="radio-option"><input type="radio" name="tipo" value="financeiro"> Resumo Financeiro (faturamento, despesas, lucro)</label>
+            {% endif %}
+        </div>
+
+        <label style="margin-top:16px;">Período</label>
+        <div class="radio-group">
+            <label class="radio-option"><input type="radio" name="periodo" value="mensal" checked onclick="togglePeriodo()"> Mensal</label>
+            <label class="radio-option"><input type="radio" name="periodo" value="semanal" onclick="togglePeriodo()"> Semanal</label>
+        </div>
+
+        <div id="campo-mensal" class="inline-form" style="margin-top:12px;">
+            <div>
+                <label>Mês</label>
+                <select name="mes">
+                    {% for i, nome in [(1,'Janeiro'),(2,'Fevereiro'),(3,'Março'),(4,'Abril'),(5,'Maio'),(6,'Junho'),(7,'Julho'),(8,'Agosto'),(9,'Setembro'),(10,'Outubro'),(11,'Novembro'),(12,'Dezembro')] %}
+                        <option value="{{ i }}" {{ 'selected' if i == hoje.month }}>{{ nome }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label>Ano</label>
+                <select name="ano">
+                    {% for a in range(hoje.year - 2, hoje.year + 1) %}
+                        <option value="{{ a }}" {{ 'selected' if a == hoje.year }}>{{ a }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <div id="campo-semanal" class="inline-form" style="margin-top:12px; display:none;">
+            <div>
+                <label>Qualquer dia da semana desejada</label>
+                <input type="date" name="data_ref" value="{{ hoje.isoformat() }}">
+            </div>
+        </div>
+
+        <button type="submit" style="margin-top:18px; width:fit-content;">📄 Gerar PDF</button>
+    </form>
+</div>
+
+<script>
+function togglePeriodo() {
+    const semanal = document.querySelector('input[name="periodo"][value="semanal"]').checked;
+    document.getElementById('campo-mensal').style.display = semanal ? 'none' : 'flex';
+    document.getElementById('campo-semanal').style.display = semanal ? 'flex' : 'none';
+}
+</script>
+{% endblock %}

@@ -1,0 +1,216 @@
+:root {
+    --blue: #3b82f6;
+    --green: #22c55e;
+    --red: #ef4444;
+    --purple: #8b5cf6;
+    --orange: #f97316;
+    --bg: #f4f6fb;
+    --card: #ffffff;
+    --border: #e5e7eb;
+    --text: #1f2937;
+    --text-light: #6b7280;
+}
+
+html.dark {
+    --bg: #0f1420;
+    --card: #171e2e;
+    --border: #2a3346;
+    --text: #e5e7eb;
+    --text-light: #9ca3af;
+}
+
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+html.dark .sidebar { background: #0a0e17; }
+html.dark .kpi-card,
+html.dark .avg-card,
+html.dark .chart-card,
+html.dark .form-card,
+html.dark .table-card,
+html.dark .login-card { box-shadow: 0 1px 3px rgba(0,0,0,0.4); }
+html.dark .inline-form input,
+html.dark .inline-form select,
+html.dark .stacked-form input,
+html.dark .login-card input {
+    background: #0f1420;
+    color: var(--text);
+    border-color: var(--border);
+}
+html.dark .month-filter select { background: #0f1420; color: var(--text); border-color: var(--border); }
+html.dark th { color: var(--text-light); }
+html.dark .flash-success { background: #14532d; color: #bbf7d0; }
+html.dark .flash-error { background: #7f1d1d; color: #fecaca; }
+
+/* ---------- LOGIN ---------- */
+.login-page {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #1e3a8a, #3b82f6);
+}
+.login-card {
+    background: var(--card);
+    padding: 40px;
+    border-radius: 16px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.2);
+    width: 360px;
+    text-align: center;
+}
+.login-icon { font-size: 42px; }
+.login-card h1 { font-size: 20px; margin: 10px 0 4px; }
+.subtitle { color: var(--text-light); margin-bottom: 20px; font-size: 14px; }
+.login-card form { display: flex; flex-direction: column; gap: 6px; text-align: left; }
+.login-card label { font-size: 13px; font-weight: 600; margin-top: 8px; }
+.login-card input {
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    font-size: 14px;
+}
+.login-card button {
+    margin-top: 18px;
+    padding: 12px;
+    border: none;
+    background: var(--blue);
+    color: white;
+    font-weight: 600;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 15px;
+}
+.login-card button:hover { background: #2563eb; }
+.hint { margin-top: 16px; font-size: 12px; color: var(--text-light); }
+
+/* ---------- LAYOUT ---------- */
+.app-shell { display: flex; min-height: 100vh; }
+.sidebar {
+    width: 230px;
+    background: #111827;
+    color: #e5e7eb;
+    display: flex;
+    flex-direction: column;
+    padding: 20px 0;
+    flex-shrink: 0;
+}
+.brand { display: flex; align-items: center; gap: 10px; padding: 0 20px 20px; border-bottom: 1px solid #1f2937; }
+.brand-icon { font-size: 28px; }
+.brand-name { font-size: 14px; font-weight: 700; line-height: 1.3; }
+.sidebar nav { display: flex; flex-direction: column; margin-top: 16px; flex: 1; }
+.sidebar nav a {
+    padding: 12px 20px;
+    color: #d1d5db;
+    text-decoration: none;
+    font-size: 14px;
+    border-left: 3px solid transparent;
+}
+.sidebar nav a:hover { background: #1f2937; }
+.sidebar nav a.active { background: #1f2937; border-left-color: var(--blue); color: white; font-weight: 600; }
+.sidebar-footer { padding: 16px 20px; border-top: 1px solid #1f2937; font-size: 13px; display: flex; flex-direction: column; gap: 6px; }
+.sidebar-footer a { color: #93c5fd; text-decoration: none; }
+.sidebar-footer span { color: #9ca3af; margin-bottom: 4px; }
+.theme-toggle {
+    background: #1f2937;
+    color: #e5e7eb;
+    border: 1px solid #374151;
+    border-radius: 6px;
+    padding: 7px 10px;
+    font-size: 13px;
+    cursor: pointer;
+    text-align: left;
+    margin: 2px 0 6px;
+}
+.theme-toggle:hover { background: #374151; }
+
+.content { flex: 1; padding: 30px 36px; max-width: 1200px; }
+
+/* ---------- FLASH ---------- */
+.flash-container { margin-bottom: 16px; }
+.flash { padding: 12px 16px; border-radius: 8px; margin-bottom: 8px; font-size: 14px; }
+.flash-success { background: #dcfce7; color: #166534; }
+.flash-error { background: #fee2e2; color: #991b1b; }
+
+/* ---------- PAGE HEADER ---------- */
+.page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; flex-wrap: wrap; gap: 10px; }
+.page-header h1 { font-size: 22px; margin: 0; }
+.period-label { color: var(--text-light); margin: 0 0 20px; font-size: 14px; }
+.month-filter { display: flex; gap: 8px; }
+.month-filter select, .month-filter button {
+    padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); font-size: 14px;
+}
+.month-filter button { background: var(--blue); color: white; border: none; cursor: pointer; font-weight: 600; }
+
+/* ---------- KPI CARDS ---------- */
+.kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
+.kpi-card {
+    background: var(--card);
+    border-radius: 12px;
+    padding: 18px 20px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    border-left: 4px solid var(--blue);
+}
+.kpi-label { display: block; font-size: 13px; color: var(--text-light); margin-bottom: 6px; }
+.kpi-value { font-size: 22px; font-weight: 700; }
+.kpi-blue { border-left-color: var(--blue); }
+.kpi-red { border-left-color: var(--red); }
+.kpi-green { border-left-color: var(--green); }
+.kpi-purple { border-left-color: var(--purple); }
+.kpi-orange { border-left-color: var(--orange); }
+
+/* ---------- AVERAGES ---------- */
+.averages-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 24px; }
+.avg-card { background: var(--card); border-radius: 12px; padding: 18px 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+.avg-card h3 { margin: 0 0 8px; font-size: 14px; color: var(--text-light); }
+.avg-card p { margin: 2px 0; font-size: 15px; font-weight: 600; }
+
+/* ---------- CHARTS ---------- */
+.charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+.chart-card { background: var(--card); border-radius: 12px; padding: 18px 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+.chart-card h3 { margin: 0 0 12px; font-size: 15px; }
+@media (max-width: 900px) { .charts-grid { grid-template-columns: 1fr; } }
+
+/* ---------- FORMS / TABLES ---------- */
+.form-card, .table-card {
+    background: var(--card);
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    margin-bottom: 24px;
+}
+.form-card h3, .table-card h3 { margin-top: 0; font-size: 15px; }
+.inline-form { display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-end; }
+.inline-form > div { display: flex; flex-direction: column; gap: 4px; }
+.inline-form .grow { flex: 1; min-width: 200px; }
+.inline-form label { font-size: 12px; font-weight: 600; color: var(--text-light); }
+.inline-form input, .inline-form select {
+    padding: 9px 10px; border-radius: 8px; border: 1px solid var(--border); font-size: 14px;
+}
+.inline-form button, .table-card button, .form-card > form.stacked-form button {
+    padding: 10px 18px; border: none; background: var(--blue); color: white; border-radius: 8px; font-weight: 600; cursor: pointer;
+}
+.inline-form button:hover { background: #2563eb; }
+.stacked-form { display: flex; flex-direction: column; gap: 6px; }
+.stacked-form label { font-size: 13px; font-weight: 600; margin-top: 6px; }
+.stacked-form input { padding: 9px 10px; border-radius: 8px; border: 1px solid var(--border); }
+.stacked-form button { margin-top: 14px; }
+
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--border); }
+th { color: var(--text-light); font-weight: 600; font-size: 12px; text-transform: uppercase; }
+.empty { text-align: center; color: var(--text-light); padding: 20px; }
+.btn-delete { background: transparent; border: 1px solid var(--red); color: var(--red); padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; }
+.btn-delete:hover { background: var(--red); color: white; }
+
+.hint-block { color: var(--text-light); font-size: 14px; margin-bottom: 16px; max-width: 700px; }
+
+.radio-group { display: flex; gap: 14px; flex-wrap: wrap; padding-top: 4px; }
+.radio-option { display: flex; align-items: center; gap: 5px; font-size: 14px; font-weight: 500; cursor: pointer; }
+.radio-option input { cursor: pointer; }
