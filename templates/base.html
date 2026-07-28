@@ -2,12 +2,11 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
     <title>{% block title %}Sistema{% endblock %} · Embalagem de Ataduras</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/flatpickr/4.6.13/flatpickr.min.css">
     <script>
-        // aplica o tema salvo antes da página renderizar, pra não piscar
         (function() {
             const tema = localStorage.getItem('tema') || 'claro';
             if (tema === 'escuro') document.documentElement.classList.add('dark');
@@ -17,22 +16,29 @@
 <body>
     {% if session.get('user_id') %}
     <div class="app-shell">
-        <aside class="sidebar">
+        <div class="topbar">
+            <button type="button" id="abrir-menu" class="hamburger" aria-label="Abrir menu">
+                <span></span><span></span><span></span>
+            </button>
+            <span class="topbar-title">Embalagem de Ataduras</span>
+        </div>
+        <div id="overlay-menu" class="overlay-menu"></div>
+        <aside class="sidebar" id="sidebar">
             <div class="brand">
                 <span class="brand-name">Embalagem<br>de Ataduras</span>
             </div>
             <nav>
-                <a href="{{ url_for('dashboard') }}" class="{{ 'active' if request.endpoint == 'dashboard' }}">📊 Dashboard</a>
-                <a href="{{ url_for('entradas') }}" class="{{ 'active' if request.endpoint == 'entradas' }}">📥 Entradas</a>
-                <a href="{{ url_for('saidas') }}" class="{{ 'active' if request.endpoint == 'saidas' }}">📤 Saídas</a>
+                <a href="{{ url_for('dashboard') }}" class="{{ 'active' if request.endpoint == 'dashboard' }}">Dashboard</a>
+                <a href="{{ url_for('entradas') }}" class="{{ 'active' if request.endpoint == 'entradas' }}">Entradas</a>
+                <a href="{{ url_for('saidas') }}" class="{{ 'active' if request.endpoint == 'saidas' }}">Saídas</a>
                 {% if is_admin() %}
-                <a href="{{ url_for('despesas') }}" class="{{ 'active' if request.endpoint == 'despesas' }}">💸 Despesas</a>
+                <a href="{{ url_for('despesas') }}" class="{{ 'active' if request.endpoint == 'despesas' }}">Despesas</a>
                 {% endif %}
                 {% if is_admin() or session.get('role') == 'texpharma' %}
-                <a href="{{ url_for('relatorios') }}" class="{{ 'active' if request.endpoint in ['relatorios','gerar_relatorio'] }}">🧾 Relatórios</a>
+                <a href="{{ url_for('relatorios') }}" class="{{ 'active' if request.endpoint in ['relatorios','gerar_relatorio'] }}">Relatórios</a>
                 {% endif %}
                 {% if is_admin() %}
-                <a href="{{ url_for('configuracoes') }}" class="{{ 'active' if request.endpoint == 'configuracoes' }}">⚙️ Configurações</a>
+                <a href="{{ url_for('configuracoes') }}" class="{{ 'active' if request.endpoint == 'configuracoes' }}">Configurações</a>
                 {% endif %}
             </nav>
             <div class="sidebar-footer">
@@ -41,7 +47,7 @@
                     {% elif session.get('role') == 'funcionario' %}<br><small>(funcionário)</small>
                     {% endif %}
                 </span>
-                <button type="button" id="toggle-tema" class="theme-toggle">🌙 Tema escuro</button>
+                <button type="button" id="toggle-tema" class="theme-toggle">Tema escuro</button>
                 <a href="{{ url_for('trocar_senha') }}">Trocar senha</a>
                 <a href="{{ url_for('logout') }}">Sair</a>
             </div>
@@ -68,9 +74,9 @@
         if (window.flatpickr) {
             flatpickr(".date-br", {
                 locale: "pt",
-                dateFormat: "Y-m-d",   // formato enviado ao servidor (não muda)
+                dateFormat: "Y-m-d",
                 altInput: true,
-                altFormat: "d/m/Y",    // formato mostrado ao usuário: dia/mês/ano
+                altFormat: "d/m/Y",
                 allowInput: true
             });
         }
@@ -80,7 +86,7 @@
         function atualizarLabel() {
             if (!btnTema) return;
             const escuro = document.documentElement.classList.contains('dark');
-            btnTema.textContent = escuro ? '☀️ Tema claro' : '🌙 Tema escuro';
+            btnTema.textContent = escuro ? 'Tema claro' : 'Tema escuro';
         }
         if (btnTema) {
             atualizarLabel();
@@ -90,6 +96,24 @@
                 localStorage.setItem('tema', escuro ? 'escuro' : 'claro');
                 atualizarLabel();
             });
+        }
+
+        // menu mobile (off-canvas)
+        const btnMenu = document.getElementById('abrir-menu');
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.getElementById('overlay-menu');
+        function fecharMenu() {
+            sidebar.classList.remove('open');
+            overlay.classList.remove('open');
+        }
+        function abrirMenu() {
+            sidebar.classList.add('open');
+            overlay.classList.add('open');
+        }
+        if (btnMenu) {
+            btnMenu.addEventListener('click', abrirMenu);
+            overlay.addEventListener('click', fecharMenu);
+            sidebar.querySelectorAll('a').forEach(a => a.addEventListener('click', fecharMenu));
         }
     </script>
 </body>

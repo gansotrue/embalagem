@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 {% block title %}Entradas{% endblock %}
 {% block content %}
-<div class="page-header"><h1>📥 Entradas de Fardos (recebidos)</h1></div>
+<div class="page-header"><h1>Entradas de Fardos (recebidos)</h1></div>
 
 {% if pode_lancar() %}
 <div class="form-card">
     <h3>Registrar nova entrada</h3>
-    <form method="POST" class="inline-form">
+    <form method="POST" class="inline-form" enctype="multipart/form-data">
         <div>
             <label>Data</label>
             <input type="text" class="date-br" name="data" required>
@@ -35,6 +35,10 @@
             <label>Observação (opcional)</label>
             <input type="text" name="obs" placeholder="Ex: fornecedor, lote, etc.">
         </div>
+        <div class="grow">
+            <label>Foto (opcional)</label>
+            <input type="file" name="foto" accept="image/*" capture="environment">
+        </div>
         <button type="submit">Adicionar</button>
     </form>
 </div>
@@ -44,8 +48,9 @@
 
 <div class="table-card">
     <h3>Últimos registros</h3>
+    <div class="table-scroll">
     <table>
-        <thead><tr><th>Data</th><th>Fornecedor</th><th>Espessura</th><th>Qtd. fardos</th><th>Observação</th>{% if is_admin() %}<th></th>{% endif %}</tr></thead>
+        <thead><tr><th>Data</th><th>Fornecedor</th><th>Espessura</th><th>Qtd. fardos</th><th>Observação</th><th>Foto</th>{% if is_admin() %}<th></th>{% endif %}</tr></thead>
         <tbody>
         {% for r in registros %}
             <tr>
@@ -54,6 +59,15 @@
                 <td>{{ r.cm }} cm</td>
                 <td>{{ r.qtd_fardos }}</td>
                 <td>{{ r.obs or '-' }}</td>
+                <td>
+                    {% if r.foto_data %}
+                    <a href="{{ url_for('foto_entrada', id=r.id) }}" target="_blank" class="foto-thumb-link">
+                        <img src="{{ url_for('foto_entrada', id=r.id) }}" class="foto-thumb" alt="Foto da entrada">
+                    </a>
+                    {% else %}
+                    <span class="sem-foto">—</span>
+                    {% endif %}
+                </td>
                 {% if is_admin() %}
                 <td class="acoes">
                     <a href="{{ url_for('editar_entrada', id=r.id) }}" class="btn-edit">Editar</a>
@@ -64,9 +78,10 @@
                 {% endif %}
             </tr>
         {% else %}
-            <tr><td colspan="6" class="empty">Nenhuma entrada registrada ainda.</td></tr>
+            <tr><td colspan="7" class="empty">Nenhuma entrada registrada ainda.</td></tr>
         {% endfor %}
         </tbody>
     </table>
+    </div>
 </div>
 {% endblock %}

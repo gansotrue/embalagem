@@ -4,3 +4,4 @@ gunicorn==22.0.0
 SQLAlchemy==2.0.31
 psycopg2-binary==2.9.12
 reportlab==4.2.2
+Pillow==10.4.0

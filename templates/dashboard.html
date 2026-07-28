@@ -44,22 +44,29 @@
         <span class="kpi-label">Fardos recebidos (entrada)</span>
         <span class="kpi-value">{{ total_fardos_entrada }}</span>
     </div>
+    <div class="kpi-card kpi-teal">
+        <span class="kpi-label">Sacos produzidos</span>
+        <span class="kpi-value">{{ total_sacos_mes }}</span>
+    </div>
 </div>
 
 <div class="averages-grid">
     <div class="avg-card">
         <h3>Média diária</h3>
         <p>{{ media_diaria_fardos }} fardos/dia</p>
+        <p>{{ media_diaria_sacos }} sacos/dia</p>
         {% if is_admin() %}<p>R$ {{ "%.2f"|format(media_diaria_faturamento)|replace(".", ",") }} /dia</p>{% endif %}
     </div>
     <div class="avg-card">
         <h3>Média semanal</h3>
         <p>{{ media_semanal_fardos }} fardos/semana</p>
+        <p>{{ media_semanal_sacos }} sacos/semana</p>
         {% if is_admin() %}<p>R$ {{ "%.2f"|format(media_semanal_faturamento)|replace(".", ",") }} /semana</p>{% endif %}
     </div>
     <div class="avg-card">
         <h3>Média mensal (projeção)</h3>
         <p>{{ total_fardos_saida }} fardos no mês</p>
+        <p>{{ total_sacos_mes }} sacos no mês</p>
         {% if is_admin() %}<p>R$ {{ "%.2f"|format(faturamento_mes)|replace(".", ",") }} /mês</p>{% endif %}
     </div>
 </div>
@@ -68,20 +75,25 @@
     {% if is_admin() %}
     <div class="chart-card">
         <h3>Faturamento diário (R$)</h3>
-        <canvas id="chartFaturamento"></canvas>
+        <div class="chart-wrap"><canvas id="chartFaturamento"></canvas></div>
     </div>
     {% endif %}
     <div class="chart-card">
         <h3>Fardos por dia — Entrada vs Saída</h3>
-        <canvas id="chartFardos"></canvas>
+        <div class="chart-wrap"><canvas id="chartFardos"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <h3>Sacos produzidos por dia</h3>
+        <div class="chart-wrap"><canvas id="chartSacos"></canvas></div>
     </div>
 </div>
 
 <div class="table-card">
-    <h3>Resumo por espessura {{ 'e faturamento' if is_admin() else '' }} no mês</h3>
+    <h3>Resumo por espessura e fornecedor no mês</h3>
+    <div class="table-scroll">
     <table>
         <thead>
-            <tr><th>Espessura</th><th>Fornecedor</th><th>Fardos entregues</th>{% if is_admin() %}<th>Faturamento</th>{% endif %}</tr>
+            <tr><th>Espessura</th><th>Fornecedor</th><th>Fardos entregues</th><th>Sacos produzidos</th>{% if is_admin() %}<th>Faturamento</th>{% endif %}</tr>
         </thead>
         <tbody>
             {% for item in breakdown_list %}
@@ -89,13 +101,15 @@
                 <td>{{ item.cm }} cm</td>
                 <td>{{ FORNECEDOR_LABEL.get(item.fornecedor, item.fornecedor) }}</td>
                 <td>{{ item.fardos }}</td>
+                <td>{{ item.sacos }}</td>
                 {% if is_admin() %}<td>R$ {{ "%.2f"|format(item.faturamento)|replace(".", ",") }}</td>{% endif %}
             </tr>
             {% else %}
-            <tr><td colspan="4" class="empty">Nenhuma saída registrada neste mês.</td></tr>
+            <tr><td colspan="5" class="empty">Nenhuma saída registrada neste mês.</td></tr>
             {% endfor %}
         </tbody>
     </table>
+    </div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
@@ -103,6 +117,7 @@
 const labels = {{ dias_labels|tojson }};
 const fardosSaida = {{ dias_fardos_saida|tojson }};
 const fardosEntrada = {{ dias_fardos_entrada|tojson }};
+const sacosDia = {{ dias_sacos|tojson }};
 
 {% if is_admin() %}
 const faturamento = {{ dias_faturamento|tojson }};
@@ -118,6 +133,7 @@ new Chart(document.getElementById('chartFaturamento'), {
     },
     options: {
         responsive: true,
+        maintainAspectRatio: false,
         plugins: { legend: { display: false } },
         scales: { y: { beginAtZero: true } }
     }
@@ -149,6 +165,25 @@ new Chart(document.getElementById('chartFardos'), {
     },
     options: {
         responsive: true,
+        maintainAspectRatio: false,
+        scales: { y: { beginAtZero: true } }
+    }
+});
+
+new Chart(document.getElementById('chartSacos'), {
+    type: 'bar',
+    data: {
+        labels: labels,
+        datasets: [{
+            label: 'Sacos produzidos',
+            data: sacosDia,
+            backgroundColor: '#14b8a6'
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
         scales: { y: { beginAtZero: true } }
     }
 });

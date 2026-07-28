@@ -1,10 +1,10 @@
 {% extends "base.html" %}
 {% block title %}{{ titulo }}{% endblock %}
 {% block content %}
-<div class="page-header"><h1>✏️ {{ titulo }}</h1></div>
+<div class="page-header"><h1>{{ titulo }}</h1></div>
 
 <div class="form-card" style="max-width: 520px;">
-    <form method="POST" class="stacked-form">
+    <form method="POST" class="stacked-form" enctype="multipart/form-data">
         <label>Data</label>
         <input type="text" class="date-br" name="data" value="{{ registro.data }}" required>
 
@@ -27,6 +27,16 @@
 
         <label>Observação (opcional)</label>
         <input type="text" name="obs" value="{{ registro.obs or '' }}">
+
+        <label>Foto</label>
+        {% if foto_url %}
+        <div class="foto-atual">
+            <img src="{{ foto_url }}" class="foto-preview" alt="Foto atual">
+        </div>
+        <label class="radio-option" style="margin-top:6px;"><input type="checkbox" name="remover_foto" value="1"> Remover foto atual</label>
+        <p class="hint-block" style="margin:4px 0 0;">Ou envie uma nova foto abaixo para substituir:</p>
+        {% endif %}
+        <input type="file" name="foto" accept="image/*" capture="environment">
 
         <div style="display:flex; gap:10px; margin-top:18px;">
             <button type="submit">Salvar alterações</button>

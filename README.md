@@ -132,3 +132,17 @@ Sem essa variável definida, o sistema usa o arquivo local `sistema.db` automati
 - Troque a chave secreta (`SECRET_KEY`) antes de usar com dados reais — no Render, isso é feito nas "Environment Variables" (Passo 2.5 acima); localmente, você pode criar um arquivo `.env` ou exportar a variável no terminal.
 - Troque a senha padrão assim que possível.
 - Mantenha o repositório do GitHub como **Private** e só adicione como colaboradores as pessoas de confiança (seus sócios).
+
+## Sacos produzidos
+
+O dashboard e os relatórios em PDF agora também mostram quantos **sacos** (pacotes de 12 unidades) foram produzidos, calculado automaticamente como `quantidade de fardos entregues × sacos por fardo` (configurado em Configurações, por espessura e fornecedor). Esse número é visível para todos os logins, já que não envolve valores em R$.
+
+## Fotos em entradas e saídas
+
+Ao lançar uma entrada ou saída, agora existe um campo opcional de **Foto** — pode tirar uma foto na hora (no celular, abre a câmera direto) ou escolher uma imagem já salva. As fotos aparecem como uma miniatura na tabela de registros (clique para ver em tamanho grande) e podem ser trocadas ou removidas na tela de edição (admin).
+
+As fotos ficam salvas dentro do próprio banco de dados (Postgres/Neon), então elas são preservadas normalmente nos backups e não dependem do disco do Render.
+
+## Uso pelo celular
+
+O sistema agora tem um layout responsivo: no celular, o menu lateral vira um menu "hambúrguer" (ícone no topo) que abre por cima da tela, os formulários ficam empilhados em coluna única, e as tabelas grandes deslizam horizontalmente com o dedo quando necessário.

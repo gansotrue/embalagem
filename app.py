@@ -5,8 +5,9 @@ from io import BytesIO
 
 from flask import Flask, render_template, request, redirect, url_for, session, flash, send_file, abort
 from werkzeug.security import generate_password_hash, check_password_hash
-from sqlalchemy import create_engine, Column, Integer, String, Float, inspect, text
+from sqlalchemy import create_engine, Column, Integer, String, Float, LargeBinary, inspect, text
 from sqlalchemy.orm import declarative_base, sessionmaker, scoped_session
+from PIL import Image, ImageOps
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -24,6 +25,7 @@ Base = declarative_base()
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "troque-esta-chave-por-uma-secreta-e-aleatoria")
+app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024  # 10 MB por requisição (fotos incluídas)
 
 FORNECEDORES = ["texpharma", "leticia"]
 FORNECEDOR_LABEL = {"texpharma": "Texpharma", "leticia": "Letícia"}
@@ -59,6 +61,8 @@ class Entrada(Base):
     fornecedor = Column(String(20), nullable=False, default="texpharma")
     qtd_fardos = Column(Integer, nullable=False)
     obs = Column(String(255))
+    foto_data = Column(LargeBinary)
+    foto_mimetype = Column(String(50))
 
 
 class Saida(Base):
@@ -69,6 +73,8 @@ class Saida(Base):
     fornecedor = Column(String(20), nullable=False, default="texpharma")
     qtd_fardos = Column(Integer, nullable=False)
     obs = Column(String(255))
+    foto_data = Column(LargeBinary)
+    foto_mimetype = Column(String(50))
 
 
 class Despesa(Base):
@@ -84,6 +90,7 @@ class Despesa(Base):
 # ---------------------------------------------------------------------------
 def run_migrations():
     insp = inspect(engine)
+    tipo_binario = "BYTEA" if engine.dialect.name == "postgresql" else "BLOB"
     with engine.begin() as conn:
         if insp.has_table("users"):
             cols = [c["name"] for c in insp.get_columns("users")]
@@ -101,11 +108,17 @@ def run_migrations():
             cols = [c["name"] for c in insp.get_columns("entradas")]
             if "fornecedor" not in cols:
                 conn.execute(text("ALTER TABLE entradas ADD COLUMN fornecedor VARCHAR(20) DEFAULT 'texpharma'"))
+            if "foto_data" not in cols:
+                conn.execute(text(f"ALTER TABLE entradas ADD COLUMN foto_data {tipo_binario}"))
+                conn.execute(text("ALTER TABLE entradas ADD COLUMN foto_mimetype VARCHAR(50)"))
 
         if insp.has_table("saidas"):
             cols = [c["name"] for c in insp.get_columns("saidas")]
             if "fornecedor" not in cols:
                 conn.execute(text("ALTER TABLE saidas ADD COLUMN fornecedor VARCHAR(20) DEFAULT 'texpharma'"))
+            if "foto_data" not in cols:
+                conn.execute(text(f"ALTER TABLE saidas ADD COLUMN foto_data {tipo_binario}"))
+                conn.execute(text("ALTER TABLE saidas ADD COLUMN foto_mimetype VARCHAR(50)"))
 
 
 def init_db():
@@ -198,6 +211,12 @@ app.jinja_env.globals["FORNECEDOR_LABEL"] = FORNECEDOR_LABEL
 app.jinja_env.filters["data_br"] = formatar_data_br
 
 
+@app.errorhandler(413)
+def arquivo_grande(e):
+    flash("A foto enviada é grande demais (máximo 10MB). Tente uma foto menor.", "error")
+    return redirect(request.referrer or url_for("dashboard"))
+
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
@@ -256,6 +275,12 @@ def valor_fardo(cm, fornecedor, config=None):
     return c["valor_fardo"] if c else 0
 
 
+def sacos_por_fardo(cm, fornecedor, config=None):
+    config = config or get_cm_config()
+    c = config.get((cm, fornecedor))
+    return c["sacos_por_fardo"] if c else 0
+
+
 def month_bounds(year, month):
     first = date(year, month, 1)
     if month == 12:
@@ -271,6 +296,24 @@ def week_bounds(ref_date):
     inicio = ref_date - timedelta(days=ref_date.weekday())
     fim = inicio + timedelta(days=6)
     return inicio, fim
+
+
+def processar_foto(arquivo):
+    """Recebe um FileStorage do formulário, redimensiona e comprime.
+    Retorna (bytes, mimetype) ou (None, None) se não houver arquivo válido."""
+    if not arquivo or not arquivo.filename:
+        return None, None
+    try:
+        img = Image.open(arquivo.stream)
+        img = ImageOps.exif_transpose(img)  # corrige rotação de fotos tiradas no celular
+        if img.mode not in ("RGB", "L"):
+            img = img.convert("RGB")
+        img.thumbnail((1280, 1280))  # reduz para no máximo 1280px no maior lado
+        buffer = BytesIO()
+        img.save(buffer, format="JPEG", quality=78, optimize=True)
+        return buffer.getvalue(), "image/jpeg"
+    except Exception:
+        return None, None
 
 
 # ---------------------------------------------------------------------------
@@ -310,6 +353,7 @@ def dashboard():
 
     total_fardos_saida = sum(row.qtd_fardos for row in saidas_mes)
     total_fardos_entrada = sum(row.qtd_fardos for row in entradas_mes)
+    total_sacos_mes = sum(row.qtd_fardos * sacos_por_fardo(row.cm, row.fornecedor, config) for row in saidas_mes)
 
     dias_no_mes = (ultimo_dia - primeiro_dia).days + 1
     if ano == hoje.year and mes == hoje.month:
@@ -319,10 +363,12 @@ def dashboard():
 
     media_diaria_faturamento = faturamento_mes / dias_considerados if dias_considerados else 0
     media_diaria_fardos = total_fardos_saida / dias_considerados if dias_considerados else 0
+    media_diaria_sacos = total_sacos_mes / dias_considerados if dias_considerados else 0
     media_semanal_faturamento = media_diaria_faturamento * 7
     media_semanal_fardos = media_diaria_fardos * 7
+    media_semanal_sacos = media_diaria_sacos * 7
 
-    dias_labels, dias_fardos_saida, dias_fardos_entrada, dias_faturamento = [], [], [], []
+    dias_labels, dias_fardos_saida, dias_fardos_entrada, dias_faturamento, dias_sacos = [], [], [], [], []
     cursor_dia = primeiro_dia
     saidas_por_dia, entradas_por_dia = {}, {}
     for row in saidas_mes:
@@ -335,21 +381,24 @@ def dashboard():
         dias_labels.append(cursor_dia.strftime("%d/%m"))
         fardos_dia = sum(r.qtd_fardos for r in saidas_por_dia.get(iso, []))
         fat_dia = sum(r.qtd_fardos * valor_fardo(r.cm, r.fornecedor, config) for r in saidas_por_dia.get(iso, []))
+        sacos_dia = sum(r.qtd_fardos * sacos_por_fardo(r.cm, r.fornecedor, config) for r in saidas_por_dia.get(iso, []))
         entradas_dia = sum(r.qtd_fardos for r in entradas_por_dia.get(iso, []))
         dias_fardos_saida.append(fardos_dia)
         dias_fardos_entrada.append(entradas_dia)
         dias_faturamento.append(round(fat_dia, 2))
+        dias_sacos.append(sacos_dia)
         cursor_dia += timedelta(days=1)
 
     breakdown = {}
     for row in saidas_mes:
         chave = (row.cm, row.fornecedor)
-        breakdown.setdefault(chave, {"fardos": 0, "faturamento": 0.0})
+        breakdown.setdefault(chave, {"fardos": 0, "sacos": 0, "faturamento": 0.0})
         breakdown[chave]["fardos"] += row.qtd_fardos
+        breakdown[chave]["sacos"] += row.qtd_fardos * sacos_por_fardo(row.cm, row.fornecedor, config)
         breakdown[chave]["faturamento"] += row.qtd_fardos * valor_fardo(row.cm, row.fornecedor, config)
 
     breakdown_list = [
-        {"cm": cm, "fornecedor": forn, "fardos": v["fardos"], "faturamento": round(v["faturamento"], 2)}
+        {"cm": cm, "fornecedor": forn, "fardos": v["fardos"], "sacos": v["sacos"], "faturamento": round(v["faturamento"], 2)}
         for (cm, forn), v in sorted(breakdown.items())
     ]
 
@@ -364,14 +413,18 @@ def dashboard():
         lucro_mes=round(lucro_mes, 2),
         total_fardos_saida=total_fardos_saida,
         total_fardos_entrada=total_fardos_entrada,
+        total_sacos_mes=total_sacos_mes,
         media_diaria_faturamento=round(media_diaria_faturamento, 2),
         media_semanal_faturamento=round(media_semanal_faturamento, 2),
         media_diaria_fardos=round(media_diaria_fardos, 1),
         media_semanal_fardos=round(media_semanal_fardos, 1),
+        media_diaria_sacos=round(media_diaria_sacos, 1),
+        media_semanal_sacos=round(media_semanal_sacos, 1),
         dias_labels=dias_labels,
         dias_fardos_saida=dias_fardos_saida,
         dias_fardos_entrada=dias_fardos_entrada,
         dias_faturamento=dias_faturamento,
+        dias_sacos=dias_sacos,
         breakdown_list=breakdown_list,
         hoje=hoje,
     )
@@ -393,7 +446,9 @@ def entradas():
         fornecedor = request.form.get("fornecedor", "texpharma")
         qtd = int(request.form.get("qtd_fardos"))
         obs = request.form.get("obs", "")
-        db.add(Entrada(data=data_reg, cm=cm, fornecedor=fornecedor, qtd_fardos=qtd, obs=obs))
+        foto_bytes, foto_mime = processar_foto(request.files.get("foto"))
+        db.add(Entrada(data=data_reg, cm=cm, fornecedor=fornecedor, qtd_fardos=qtd, obs=obs,
+                        foto_data=foto_bytes, foto_mimetype=foto_mime))
         db.commit()
         flash("Entrada registrada com sucesso!", "success")
         return redirect(url_for("entradas"))
@@ -401,6 +456,16 @@ def entradas():
     registros = db.query(Entrada).order_by(Entrada.data.desc(), Entrada.id.desc()).limit(200).all()
     cms = sorted({r.cm for r in db.query(CmConfig).all()})
     return render_template("entradas.html", registros=registros, cms=cms, fornecedores=FORNECEDORES)
+
+
+@app.route("/entradas/foto/<int:id>")
+@login_required
+def foto_entrada(id):
+    db = Session()
+    reg = db.query(Entrada).get(id)
+    if not reg or not reg.foto_data:
+        abort(404)
+    return send_file(BytesIO(reg.foto_data), mimetype=reg.foto_mimetype or "image/jpeg")
 
 
 @app.route("/entradas/excluir/<int:id>", methods=["POST"])
@@ -430,6 +495,14 @@ def editar_entrada(id):
         reg.fornecedor = request.form.get("fornecedor", "texpharma")
         reg.qtd_fardos = int(request.form.get("qtd_fardos"))
         reg.obs = request.form.get("obs", "")
+        if request.form.get("remover_foto") == "1":
+            reg.foto_data = None
+            reg.foto_mimetype = None
+        else:
+            foto_bytes, foto_mime = processar_foto(request.files.get("foto"))
+            if foto_bytes:
+                reg.foto_data = foto_bytes
+                reg.foto_mimetype = foto_mime
         db.commit()
         flash("Entrada atualizada com sucesso!", "success")
         return redirect(url_for("entradas"))
@@ -437,6 +510,7 @@ def editar_entrada(id):
     cms = sorted({r.cm for r in db.query(CmConfig).all()})
     return render_template("editar_registro.html", registro=reg, cms=cms, fornecedores=FORNECEDORES,
                             voltar_url=url_for("entradas"), salvar_url=url_for("editar_entrada", id=id),
+                            foto_url=url_for("foto_entrada", id=id) if reg.foto_data else None,
                             titulo="Editar entrada")
 
 
@@ -456,7 +530,9 @@ def saidas():
         fornecedor = request.form.get("fornecedor", "texpharma")
         qtd = int(request.form.get("qtd_fardos"))
         obs = request.form.get("obs", "")
-        db.add(Saida(data=data_reg, cm=cm, fornecedor=fornecedor, qtd_fardos=qtd, obs=obs))
+        foto_bytes, foto_mime = processar_foto(request.files.get("foto"))
+        db.add(Saida(data=data_reg, cm=cm, fornecedor=fornecedor, qtd_fardos=qtd, obs=obs,
+                      foto_data=foto_bytes, foto_mimetype=foto_mime))
         db.commit()
         flash("Saída registrada com sucesso!", "success")
         return redirect(url_for("saidas"))
@@ -465,6 +541,16 @@ def saidas():
     cms = sorted({r.cm for r in db.query(CmConfig).all()})
     config_map = get_cm_config()
     return render_template("saidas.html", registros=registros, cms=cms, fornecedores=FORNECEDORES, config_map=config_map)
+
+
+@app.route("/saidas/foto/<int:id>")
+@login_required
+def foto_saida(id):
+    db = Session()
+    reg = db.query(Saida).get(id)
+    if not reg or not reg.foto_data:
+        abort(404)
+    return send_file(BytesIO(reg.foto_data), mimetype=reg.foto_mimetype or "image/jpeg")
 
 
 @app.route("/saidas/excluir/<int:id>", methods=["POST"])
@@ -494,6 +580,14 @@ def editar_saida(id):
         reg.fornecedor = request.form.get("fornecedor", "texpharma")
         reg.qtd_fardos = int(request.form.get("qtd_fardos"))
         reg.obs = request.form.get("obs", "")
+        if request.form.get("remover_foto") == "1":
+            reg.foto_data = None
+            reg.foto_mimetype = None
+        else:
+            foto_bytes, foto_mime = processar_foto(request.files.get("foto"))
+            if foto_bytes:
+                reg.foto_data = foto_bytes
+                reg.foto_mimetype = foto_mime
         db.commit()
         flash("Saída atualizada com sucesso!", "success")
         return redirect(url_for("saidas"))
@@ -501,6 +595,7 @@ def editar_saida(id):
     cms = sorted({r.cm for r in db.query(CmConfig).all()})
     return render_template("editar_registro.html", registro=reg, cms=cms, fornecedores=FORNECEDORES,
                             voltar_url=url_for("saidas"), salvar_url=url_for("editar_saida", id=id),
+                            foto_url=url_for("foto_saida", id=id) if reg.foto_data else None,
                             titulo="Editar saída")
 
 
@@ -656,11 +751,13 @@ def gerar_relatorio():
     if tipo_relatorio == "logistico":
         total_entrada = sum(r.qtd_fardos for r in entradas)
         total_saida = sum(r.qtd_fardos for r in saidas)
+        total_sacos = sum(r.qtd_fardos * sacos_por_fardo(r.cm, r.fornecedor, config) for r in saidas)
 
         resumo_data = [["Indicador", "Valor"],
                         ["Total de fardos recebidos (entrada)", str(total_entrada)],
                         ["Total de fardos entregues (saída)", str(total_saida)],
-                        ["Saldo (entrada - saída)", str(total_entrada - total_saida)]]
+                        ["Total de sacos produzidos", str(total_sacos)],
+                        ["Saldo (entrada - saída, em fardos)", str(total_entrada - total_saida)]]
         t = Table(resumo_data, colWidths=[10 * cm, 6 * cm])
         t.setStyle(header_style)
         story.append(t)
@@ -672,24 +769,26 @@ def gerar_relatorio():
         detalhe = {}
         for r in entradas:
             k = (r.cm, r.fornecedor)
-            detalhe.setdefault(k, {"entrada": 0, "saida": 0})
+            detalhe.setdefault(k, {"entrada": 0, "saida": 0, "sacos": 0})
             detalhe[k]["entrada"] += r.qtd_fardos
         for r in saidas:
             k = (r.cm, r.fornecedor)
-            detalhe.setdefault(k, {"entrada": 0, "saida": 0})
+            detalhe.setdefault(k, {"entrada": 0, "saida": 0, "sacos": 0})
             detalhe[k]["saida"] += r.qtd_fardos
+            detalhe[k]["sacos"] += r.qtd_fardos * sacos_por_fardo(r.cm, r.fornecedor, config)
 
-        det_data = [["Espessura", "Fornecedor", "Entrada (fardos)", "Saída (fardos)"]]
+        det_data = [["Espessura", "Fornecedor", "Entrada (fardos)", "Saída (fardos)", "Sacos produzidos"]]
         for (cm_v, forn), v in sorted(detalhe.items()):
-            det_data.append([f"{cm_v} cm", FORNECEDOR_LABEL.get(forn, forn), str(v["entrada"]), str(v["saida"])])
+            det_data.append([f"{cm_v} cm", FORNECEDOR_LABEL.get(forn, forn), str(v["entrada"]), str(v["saida"]), str(v["sacos"])])
         if len(det_data) == 1:
-            det_data.append(["-", "-", "-", "-"])
-        t2 = Table(det_data, colWidths=[4 * cm, 4 * cm, 4 * cm, 4 * cm])
+            det_data.append(["-", "-", "-", "-", "-"])
+        t2 = Table(det_data, colWidths=[3.2 * cm, 3.2 * cm, 3.2 * cm, 3.2 * cm, 3.4 * cm])
         t2.setStyle(header_style)
         story.append(t2)
 
     else:  # financeiro
         faturamento = sum(r.qtd_fardos * valor_fardo(r.cm, r.fornecedor, config) for r in saidas)
+        total_sacos = sum(r.qtd_fardos * sacos_por_fardo(r.cm, r.fornecedor, config) for r in saidas)
         despesas = db.query(Despesa).filter(
             Despesa.data >= inicio.isoformat(), Despesa.data <= fim.isoformat()
         ).all()
@@ -701,6 +800,7 @@ def gerar_relatorio():
 
         resumo_data = [["Indicador", "Valor"],
                         ["Faturamento (fardos entregues)", fmt(faturamento)],
+                        ["Total de sacos produzidos", str(total_sacos)],
                         ["Despesas no período", fmt(total_despesas)],
                         ["Lucro no período", fmt(lucro)]]
         t = Table(resumo_data, colWidths=[10 * cm, 6 * cm])
@@ -713,16 +813,17 @@ def gerar_relatorio():
         detalhe = {}
         for r in saidas:
             k = (r.cm, r.fornecedor)
-            detalhe.setdefault(k, {"fardos": 0, "valor": 0.0})
+            detalhe.setdefault(k, {"fardos": 0, "sacos": 0, "valor": 0.0})
             detalhe[k]["fardos"] += r.qtd_fardos
+            detalhe[k]["sacos"] += r.qtd_fardos * sacos_por_fardo(r.cm, r.fornecedor, config)
             detalhe[k]["valor"] += r.qtd_fardos * valor_fardo(r.cm, r.fornecedor, config)
 
-        det_data = [["Espessura", "Fornecedor", "Fardos entregues", "Faturamento"]]
+        det_data = [["Espessura", "Fornecedor", "Fardos entregues", "Sacos produzidos", "Faturamento"]]
         for (cm_v, forn), v in sorted(detalhe.items()):
-            det_data.append([f"{cm_v} cm", FORNECEDOR_LABEL.get(forn, forn), str(v["fardos"]), fmt(v["valor"])])
+            det_data.append([f"{cm_v} cm", FORNECEDOR_LABEL.get(forn, forn), str(v["fardos"]), str(v["sacos"]), fmt(v["valor"])])
         if len(det_data) == 1:
-            det_data.append(["-", "-", "-", "-"])
-        t2 = Table(det_data, colWidths=[4 * cm, 4 * cm, 4 * cm, 4 * cm])
+            det_data.append(["-", "-", "-", "-", "-"])
+        t2 = Table(det_data, colWidths=[3.2 * cm, 3.2 * cm, 3.2 * cm, 3.2 * cm, 3.4 * cm])
         t2.setStyle(header_style)
         story.append(t2)
 
