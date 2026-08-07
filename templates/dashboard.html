@@ -45,7 +45,7 @@
         <span class="kpi-value">{{ total_fardos_entrada }}</span>
     </div>
     <div class="kpi-card kpi-teal">
-        <span class="kpi-label">Sacos produzidos</span>
+        <span class="kpi-label">Dúzias produzidas</span>
         <span class="kpi-value">{{ total_sacos_mes }}</span>
     </div>
 </div>
@@ -54,19 +54,19 @@
     <div class="avg-card">
         <h3>Média diária</h3>
         <p>{{ media_diaria_fardos }} fardos/dia</p>
-        <p>{{ media_diaria_sacos }} sacos/dia</p>
+        <p>{{ media_diaria_sacos }} dúzias/dia</p>
         {% if is_admin() %}<p>R$ {{ "%.2f"|format(media_diaria_faturamento)|replace(".", ",") }} /dia</p>{% endif %}
     </div>
     <div class="avg-card">
         <h3>Média semanal</h3>
         <p>{{ media_semanal_fardos }} fardos/semana</p>
-        <p>{{ media_semanal_sacos }} sacos/semana</p>
+        <p>{{ media_semanal_sacos }} dúzias/semana</p>
         {% if is_admin() %}<p>R$ {{ "%.2f"|format(media_semanal_faturamento)|replace(".", ",") }} /semana</p>{% endif %}
     </div>
     <div class="avg-card">
         <h3>Média mensal (projeção)</h3>
         <p>{{ total_fardos_saida }} fardos no mês</p>
-        <p>{{ total_sacos_mes }} sacos no mês</p>
+        <p>{{ total_sacos_mes }} dúzias no mês</p>
         {% if is_admin() %}<p>R$ {{ "%.2f"|format(faturamento_mes)|replace(".", ",") }} /mês</p>{% endif %}
     </div>
 </div>
@@ -83,7 +83,7 @@
         <div class="chart-wrap"><canvas id="chartFardos"></canvas></div>
     </div>
     <div class="chart-card">
-        <h3>Sacos produzidos por dia</h3>
+        <h3>Dúzias produzidas por dia</h3>
         <div class="chart-wrap"><canvas id="chartSacos"></canvas></div>
     </div>
 </div>
@@ -93,7 +93,7 @@
     <div class="table-scroll">
     <table>
         <thead>
-            <tr><th>Espessura</th><th>Fornecedor</th><th>Fardos entregues</th><th>Sacos produzidos</th>{% if is_admin() %}<th>Faturamento</th>{% endif %}</tr>
+            <tr><th>Espessura</th><th>Fornecedor</th><th>Fardos entregues</th><th>Dúzias produzidas</th>{% if is_admin() %}<th>Faturamento</th>{% endif %}</tr>
         </thead>
         <tbody>
             {% for item in breakdown_list %}
@@ -175,7 +175,7 @@ new Chart(document.getElementById('chartSacos'), {
     data: {
         labels: labels,
         datasets: [{
-            label: 'Sacos produzidos',
+            label: 'Dúzias produzidas',
             data: sacosDia,
             backgroundColor: '#14b8a6'
         }]

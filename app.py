@@ -756,7 +756,7 @@ def gerar_relatorio():
         resumo_data = [["Indicador", "Valor"],
                         ["Total de fardos recebidos (entrada)", str(total_entrada)],
                         ["Total de fardos entregues (saída)", str(total_saida)],
-                        ["Total de sacos produzidos", str(total_sacos)],
+                        ["Total de dúzias produzidas", str(total_sacos)],
                         ["Saldo (entrada - saída, em fardos)", str(total_entrada - total_saida)]]
         t = Table(resumo_data, colWidths=[10 * cm, 6 * cm])
         t.setStyle(header_style)
@@ -777,7 +777,7 @@ def gerar_relatorio():
             detalhe[k]["saida"] += r.qtd_fardos
             detalhe[k]["sacos"] += r.qtd_fardos * sacos_por_fardo(r.cm, r.fornecedor, config)
 
-        det_data = [["Espessura", "Fornecedor", "Entrada (fardos)", "Saída (fardos)", "Sacos produzidos"]]
+        det_data = [["Espessura", "Fornecedor", "Entrada (fardos)", "Saída (fardos)", "Dúzias produzidas"]]
         for (cm_v, forn), v in sorted(detalhe.items()):
             det_data.append([f"{cm_v} cm", FORNECEDOR_LABEL.get(forn, forn), str(v["entrada"]), str(v["saida"]), str(v["sacos"])])
         if len(det_data) == 1:
@@ -800,7 +800,7 @@ def gerar_relatorio():
 
         resumo_data = [["Indicador", "Valor"],
                         ["Faturamento (fardos entregues)", fmt(faturamento)],
-                        ["Total de sacos produzidos", str(total_sacos)],
+                        ["Total de dúzias produzidas", str(total_sacos)],
                         ["Despesas no período", fmt(total_despesas)],
                         ["Lucro no período", fmt(lucro)]]
         t = Table(resumo_data, colWidths=[10 * cm, 6 * cm])
@@ -818,7 +818,7 @@ def gerar_relatorio():
             detalhe[k]["sacos"] += r.qtd_fardos * sacos_por_fardo(r.cm, r.fornecedor, config)
             detalhe[k]["valor"] += r.qtd_fardos * valor_fardo(r.cm, r.fornecedor, config)
 
-        det_data = [["Espessura", "Fornecedor", "Fardos entregues", "Sacos produzidos", "Faturamento"]]
+        det_data = [["Espessura", "Fornecedor", "Fardos entregues", "Dúzias produzidas", "Faturamento"]]
         for (cm_v, forn), v in sorted(detalhe.items()):
             det_data.append([f"{cm_v} cm", FORNECEDOR_LABEL.get(forn, forn), str(v["fardos"]), str(v["sacos"]), fmt(v["valor"])])
         if len(det_data) == 1:
