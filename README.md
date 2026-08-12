@@ -146,3 +146,22 @@ As fotos ficam salvas dentro do próprio banco de dados (Postgres/Neon), então 
 ## Uso pelo celular
 
 O sistema agora tem um layout responsivo: no celular, o menu lateral vira um menu "hambúrguer" (ícone no topo) que abre por cima da tela, os formulários ficam empilhados em coluna única, e as tabelas grandes deslizam horizontalmente com o dedo quando necessário.
+
+## Módulo de Produção (funcionários que enfardam)
+
+Dois novos logins para os funcionários que fazem o enfardamento (Clare e Gabriel):
+
+| Usuário | Senha inicial | Acesso |
+|---|---|---|
+| `clare` | `1234` | Lança a própria produção + vê o próprio dashboard (ganhos) |
+| `gabriel` | `1234` | Lança a própria produção + vê o próprio dashboard (ganhos) |
+
+**Na primeira vez que logam, são obrigados a trocar a senha** antes de conseguir usar qualquer outra parte do sistema.
+
+Cada um só vê e lança a **própria** produção — nunca a do outro. Ao lançar, preenchem data, marca (Texpharma/Letícia), espessura, quantidade de fardos, observação (opcional) e **foto obrigatória** do que foi produzido.
+
+O dashboard deles é simplificado: fardos produzidos, quanto ganharam no mês (baseado numa taxa por fardo que você configura) e um gráfico simples — sem nenhum acesso a valores financeiros da empresa, despesas, entradas/saídas ou relatórios.
+
+**Taxa de pagamento por fardo:** configurável em Configurações → "Taxa paga aos funcionários de produção". Valores iniciais: 10cm = R$3,00 · 15cm = R$2,00 · 20cm = R$1,50 (6cm e 8cm vêm zerados, preencha se for usar).
+
+**Você (admin) vê tudo:** a página "Produção (funcionários)" no menu mostra todos os lançamentos de todos os funcionários, com fotos, valores e opção de editar/excluir. E o melhor: **o custo de mão de obra deles entra automaticamente no seu Lucro do mês** (aparece dentro do card "Despesas do mês" e também nos relatórios em PDF financeiro) — você não precisa lançar isso manualmente como despesa.

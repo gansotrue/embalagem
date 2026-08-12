@@ -29,9 +29,14 @@
             </div>
             <nav>
                 <a href="{{ url_for('dashboard') }}" class="{{ 'active' if request.endpoint == 'dashboard' }}">Dashboard</a>
+                {% if is_producao() %}
+                <a href="{{ url_for('producao') }}" class="{{ 'active' if request.endpoint == 'producao' }}">Minha Produção</a>
+                {% else %}
                 <a href="{{ url_for('entradas') }}" class="{{ 'active' if request.endpoint == 'entradas' }}">Entradas</a>
                 <a href="{{ url_for('saidas') }}" class="{{ 'active' if request.endpoint == 'saidas' }}">Saídas</a>
+                {% endif %}
                 {% if is_admin() %}
+                <a href="{{ url_for('producao_admin') }}" class="{{ 'active' if request.endpoint in ['producao_admin','editar_producao'] }}">Produção (funcionários)</a>
                 <a href="{{ url_for('despesas') }}" class="{{ 'active' if request.endpoint == 'despesas' }}">Despesas</a>
                 {% endif %}
                 {% if is_admin() or session.get('role') == 'texpharma' %}
@@ -45,6 +50,7 @@
                 <span>Olá, {{ session.get('username') }}
                     {% if session.get('role') == 'texpharma' %}<br><small>(visualização)</small>
                     {% elif session.get('role') == 'funcionario' %}<br><small>(funcionário)</small>
+                    {% elif session.get('role') == 'producao' %}<br><small>(produção)</small>
                     {% endif %}
                 </span>
                 <button type="button" id="toggle-tema" class="theme-toggle">Tema escuro</button>

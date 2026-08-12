@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Produção (funcionários){% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Produção dos funcionários</h1>
+    <form class="month-filter" method="GET">
+        <select name="mes">
+            {% for i, nome in [(1,'Janeiro'),(2,'Fevereiro'),(3,'Março'),(4,'Abril'),(5,'Maio'),(6,'Junho'),(7,'Julho'),(8,'Agosto'),(9,'Setembro'),(10,'Outubro'),(11,'Novembro'),(12,'Dezembro')] %}
+                <option value="{{ i }}" {{ 'selected' if i == mes }}>{{ nome }}</option>
+            {% endfor %}
+        </select>
+        <select name="ano">
+            {% for a in range(hoje.year - 2, hoje.year + 1) %}
+                <option value="{{ a }}" {{ 'selected' if a == ano }}>{{ a }}</option>
+            {% endfor %}
+        </select>
+        <button type="submit">Filtrar</button>
+    </form>
+</div>
+<p class="period-label">Exibindo dados de <b>{{ mes_nome }} / {{ ano }}</b></p>
+
+<div class="table-card">
+    <h3>Todos os lançamentos do mês</h3>
+    <div class="table-scroll">
+    <table>
+        <thead><tr><th>Data</th><th>Funcionário</th><th>Marca</th><th>Espessura</th><th>Qtd. fardos</th><th>Valor a pagar</th><th>Observação</th><th>Foto</th><th></th></tr></thead>
+        <tbody>
+        {% for r in registros %}
+            <tr>
+                <td>{{ r.data|data_br }}</td>
+                <td>{{ r.usuario }}</td>
+                <td>{{ FORNECEDOR_LABEL.get(r.fornecedor, r.fornecedor) }}</td>
+                <td>{{ r.cm }} cm</td>
+                <td>{{ r.qtd_fardos }}</td>
+                <td>R$ {{ "%.2f"|format(r.qtd_fardos * taxas.get(r.cm, 0))|replace(".", ",") }}</td>
+                <td>{{ r.obs or '-' }}</td>
+                <td>
+                    <a href="{{ url_for('foto_producao', id=r.id) }}" target="_blank" class="foto-thumb-link">
+                        <img src="{{ url_for('foto_producao', id=r.id) }}" class="foto-thumb" alt="Foto da produção">
+                    </a>
+                </td>
+                <td class="acoes">
+                    <a href="{{ url_for('editar_producao', id=r.id) }}" class="btn-edit">Editar</a>
+                    <form method="POST" action="{{ url_for('excluir_producao', id=r.id) }}" onsubmit="return confirm('Excluir este registro?');">
+                        <button type="submit" class="btn-delete">Excluir</button>
+                    </form>
+                </td>
+            </tr>
+        {% else %}
+            <tr><td colspan="9" class="empty">Nenhuma produção lançada neste mês.</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    </div>
+</div>
+{% endblock %}

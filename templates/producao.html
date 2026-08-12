@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Minha Produção{% endblock %}
+{% block content %}
+<div class="page-header"><h1>Minha Produção</h1></div>
+<p class="hint-block">Lance aqui os fardos que você enfardou. A foto é obrigatória em todo lançamento.</p>
+
+<div class="form-card">
+    <h3>Registrar produção</h3>
+    <form method="POST" class="inline-form" enctype="multipart/form-data">
+        <div>
+            <label>Data</label>
+            <input type="text" class="date-br" name="data" required>
+        </div>
+        <div>
+            <label>Marca</label>
+            <div class="radio-group">
+                {% for f in fornecedores %}
+                <label class="radio-option"><input type="radio" name="fornecedor" value="{{ f }}" {{ 'checked' if loop.first }}> {{ FORNECEDOR_LABEL.get(f, f) }}</label>
+                {% endfor %}
+            </div>
+        </div>
+        <div>
+            <label>Espessura (cm)</label>
+            <select name="cm" required>
+                {% for cm in cms %}
+                <option value="{{ cm }}">{{ cm }} cm</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label>Qtd. de fardos</label>
+            <input type="number" name="qtd_fardos" min="1" required>
+        </div>
+        <div class="grow">
+            <label>Observação (opcional)</label>
+            <input type="text" name="obs">
+        </div>
+        <div class="grow">
+            <label>Foto (obrigatória)</label>
+            <input type="file" name="foto" accept="image/*" capture="environment" required>
+        </div>
+        <button type="submit">Adicionar</button>
+    </form>
+</div>
+
+<div class="table-card">
+    <h3>Meus últimos lançamentos</h3>
+    <div class="table-scroll">
+    <table>
+        <thead><tr><th>Data</th><th>Marca</th><th>Espessura</th><th>Qtd. fardos</th><th>Observação</th><th>Foto</th></tr></thead>
+        <tbody>
+        {% for r in registros %}
+            <tr>
+                <td>{{ r.data|data_br }}</td>
+                <td>{{ FORNECEDOR_LABEL.get(r.fornecedor, r.fornecedor) }}</td>
+                <td>{{ r.cm }} cm</td>
+                <td>{{ r.qtd_fardos }}</td>
+                <td>{{ r.obs or '-' }}</td>
+                <td>
+                    <a href="{{ url_for('foto_producao', id=r.id) }}" target="_blank" class="foto-thumb-link">
+                        <img src="{{ url_for('foto_producao', id=r.id) }}" class="foto-thumb" alt="Foto da produção">
+                    </a>
+                </td>
+            </tr>
+        {% else %}
+            <tr><td colspan="6" class="empty">Você ainda não lançou nenhuma produção.</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    </div>
+</div>
+{% endblock %}

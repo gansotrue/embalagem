@@ -5,7 +5,7 @@ from io import BytesIO
 
 from flask import Flask, render_template, request, redirect, url_for, session, flash, send_file, abort
 from werkzeug.security import generate_password_hash, check_password_hash
-from sqlalchemy import create_engine, Column, Integer, String, Float, LargeBinary, inspect, text
+from sqlalchemy import create_engine, Column, Integer, String, Float, LargeBinary, Boolean, inspect, text
 from sqlalchemy.orm import declarative_base, sessionmaker, scoped_session
 from PIL import Image, ImageOps
 
@@ -40,7 +40,9 @@ class User(Base):
     username = Column(String(80), unique=True, nullable=False)
     password_hash = Column(String(255), nullable=False)
     role = Column(String(20), nullable=False, default="admin")
+    must_change_password = Column(Boolean, nullable=False, default=False)
     # roles: admin | texpharma (só visualiza logística) | funcionario (visualiza + lança logística)
+    #        | producao (funcionário que enfarda — lança só a própria produção)
 
 
 class CmConfig(Base):
@@ -51,6 +53,14 @@ class CmConfig(Base):
     sacos_por_fardo = Column(Integer, nullable=False, default=0)
     valor_pacote = Column(Float, nullable=False, default=0.15)
     valor_fardo = Column(Float, nullable=False, default=0)
+
+
+class TaxaProducao(Base):
+    """Quanto se paga a um funcionário de produção por fardo enfardado, por espessura."""
+    __tablename__ = "taxa_producao"
+    id = Column(Integer, primary_key=True)
+    cm = Column(Integer, nullable=False, unique=True)
+    valor_por_fardo = Column(Float, nullable=False, default=0)
 
 
 class Entrada(Base):
@@ -77,6 +87,20 @@ class Saida(Base):
     foto_mimetype = Column(String(50))
 
 
+class Producao(Base):
+    """Produção lançada pelos funcionários que enfardam (Clare, Gabriel, etc)."""
+    __tablename__ = "producoes"
+    id = Column(Integer, primary_key=True)
+    data = Column(String(10), nullable=False)
+    cm = Column(Integer, nullable=False)
+    fornecedor = Column(String(20), nullable=False, default="texpharma")
+    qtd_fardos = Column(Integer, nullable=False)
+    obs = Column(String(255))
+    foto_data = Column(LargeBinary, nullable=False)
+    foto_mimetype = Column(String(50))
+    usuario = Column(String(80), nullable=False)  # username de quem lançou
+
+
 class Despesa(Base):
     __tablename__ = "despesas"
     id = Column(Integer, primary_key=True)
@@ -96,6 +120,8 @@ def run_migrations():
             cols = [c["name"] for c in insp.get_columns("users")]
             if "role" not in cols:
                 conn.execute(text("ALTER TABLE users ADD COLUMN role VARCHAR(20) DEFAULT 'admin'"))
+            if "must_change_password" not in cols:
+                conn.execute(text("ALTER TABLE users ADD COLUMN must_change_password BOOLEAN DEFAULT FALSE"))
 
         if insp.has_table("cm_config"):
             cols = [c["name"] for c in insp.get_columns("cm_config")]
@@ -127,14 +153,17 @@ def init_db():
     db = Session()
 
     seed_users = [
-        ("gansotrue", "130502", "admin"),
-        ("texpharma", "tex123", "texpharma"),
-        ("funcionario", "fun123", "funcionario"),
+        ("gansotrue", "130502", "admin", False),
+        ("texpharma", "tex123", "texpharma", False),
+        ("funcionario", "fun123", "funcionario", False),
+        ("clare", "1234", "producao", True),
+        ("gabriel", "1234", "producao", True),
     ]
-    for username, pwd, role in seed_users:
+    for username, pwd, role, forcar_troca in seed_users:
         existing = db.query(User).filter_by(username=username).first()
         if not existing:
-            db.add(User(username=username, password_hash=generate_password_hash(pwd), role=role))
+            db.add(User(username=username, password_hash=generate_password_hash(pwd), role=role,
+                        must_change_password=forcar_troca))
         elif not existing.role:
             existing.role = role
 
@@ -151,6 +180,12 @@ def init_db():
         if not db.query(CmConfig).filter_by(cm=cm, fornecedor="leticia").first():
             db.add(CmConfig(cm=cm, fornecedor="leticia", sacos_por_fardo=sacos,
                              valor_pacote=valor_pacote, valor_fardo=round(sacos * valor_pacote, 2)))
+
+    # Taxa paga aos funcionários de produção, por espessura (independe do fornecedor)
+    defaults_taxa_producao = [(6, 0), (8, 0), (10, 3.00), (15, 2.00), (20, 1.50)]
+    for cm, valor in defaults_taxa_producao:
+        if not db.query(TaxaProducao).filter_by(cm=cm).first():
+            db.add(TaxaProducao(cm=cm, valor_por_fardo=valor))
 
     db.commit()
     db.close()
@@ -192,6 +227,10 @@ def is_admin():
     return session.get("role") == "admin"
 
 
+def is_producao():
+    return session.get("role") == "producao"
+
+
 def pode_lancar():
     """Admin e funcionário podem adicionar entradas/saídas; texpharma só visualiza."""
     return session.get("role") in ("admin", "funcionario")
@@ -206,6 +245,7 @@ def formatar_data_br(iso_str):
 
 
 app.jinja_env.globals["is_admin"] = is_admin
+app.jinja_env.globals["is_producao"] = is_producao
 app.jinja_env.globals["pode_lancar"] = pode_lancar
 app.jinja_env.globals["FORNECEDOR_LABEL"] = FORNECEDOR_LABEL
 app.jinja_env.filters["data_br"] = formatar_data_br
@@ -215,6 +255,16 @@ app.jinja_env.filters["data_br"] = formatar_data_br
 def arquivo_grande(e):
     flash("A foto enviada é grande demais (máximo 10MB). Tente uma foto menor.", "error")
     return redirect(request.referrer or url_for("dashboard"))
+
+
+@app.before_request
+def forcar_troca_senha_inicial():
+    """Se o usuário está com a senha padrão, obriga a trocar antes de usar o resto do sistema."""
+    if session.get("user_id") and session.get("must_change_password"):
+        rotas_permitidas = {"trocar_senha", "logout", "static"}
+        if request.endpoint not in rotas_permitidas:
+            flash("Por segurança, troque sua senha padrão antes de continuar.", "error")
+            return redirect(url_for("trocar_senha"))
 
 
 @app.route("/login", methods=["GET", "POST"])
@@ -228,6 +278,7 @@ def login():
             session["user_id"] = user.id
             session["username"] = user.username
             session["role"] = user.role
+            session["must_change_password"] = bool(user.must_change_password)
             return redirect(url_for("dashboard"))
         flash("Usuário ou senha inválidos.", "error")
     return render_template("login.html")
@@ -249,7 +300,9 @@ def trocar_senha():
         user = db.query(User).get(session["user_id"])
         if user and check_password_hash(user.password_hash, atual):
             user.password_hash = generate_password_hash(nova)
+            user.must_change_password = False
             db.commit()
+            session["must_change_password"] = False
             flash("Senha alterada com sucesso.", "success")
         else:
             flash("Senha atual incorreta.", "error")
@@ -279,6 +332,17 @@ def sacos_por_fardo(cm, fornecedor, config=None):
     config = config or get_cm_config()
     c = config.get((cm, fornecedor))
     return c["sacos_por_fardo"] if c else 0
+
+
+def get_taxa_producao():
+    db = Session()
+    rows = db.query(TaxaProducao).all()
+    return {row.cm: row.valor_por_fardo for row in rows}
+
+
+def taxa_producao(cm, taxas=None):
+    taxas = taxas or get_taxa_producao()
+    return taxas.get(cm, 0)
 
 
 def month_bounds(year, month):
@@ -328,12 +392,16 @@ def index():
 @app.route("/dashboard")
 @login_required
 def dashboard():
+    if is_producao():
+        return dashboard_producao()
+
     hoje = date.today()
     ano = int(request.args.get("ano", hoje.year))
     mes = int(request.args.get("mes", hoje.month))
 
     primeiro_dia, ultimo_dia = month_bounds(ano, mes)
     config = get_cm_config()
+    taxas = get_taxa_producao()
 
     db = Session()
 
@@ -346,10 +414,26 @@ def dashboard():
     despesas_mes = db.query(Despesa).filter(
         Despesa.data >= primeiro_dia.isoformat(), Despesa.data <= ultimo_dia.isoformat()
     ).all()
+    producao_mes = db.query(Producao).filter(
+        Producao.data >= primeiro_dia.isoformat(), Producao.data <= ultimo_dia.isoformat()
+    ).all()
 
     faturamento_mes = sum(row.qtd_fardos * valor_fardo(row.cm, row.fornecedor, config) for row in saidas_mes)
-    total_despesas = sum(row.valor for row in despesas_mes)
+    total_despesas_lancadas = sum(row.valor for row in despesas_mes)
+    custo_producao_mes = sum(row.qtd_fardos * taxa_producao(row.cm, taxas) for row in producao_mes)
+    total_despesas = total_despesas_lancadas + custo_producao_mes
     lucro_mes = faturamento_mes - total_despesas
+
+    # quebra do custo de produção por funcionário (pra saber quanto pagar a cada um)
+    producao_por_funcionario = {}
+    for row in producao_mes:
+        producao_por_funcionario.setdefault(row.usuario, {"fardos": 0, "valor": 0.0})
+        producao_por_funcionario[row.usuario]["fardos"] += row.qtd_fardos
+        producao_por_funcionario[row.usuario]["valor"] += row.qtd_fardos * taxa_producao(row.cm, taxas)
+    producao_funcionarios_list = [
+        {"usuario": u, "fardos": v["fardos"], "valor": round(v["valor"], 2)}
+        for u, v in sorted(producao_por_funcionario.items())
+    ]
 
     total_fardos_saida = sum(row.qtd_fardos for row in saidas_mes)
     total_fardos_entrada = sum(row.qtd_fardos for row in entradas_mes)
@@ -410,6 +494,9 @@ def dashboard():
         ano=ano, mes=mes, mes_nome=meses_nomes[mes],
         faturamento_mes=round(faturamento_mes, 2),
         total_despesas=round(total_despesas, 2),
+        total_despesas_lancadas=round(total_despesas_lancadas, 2),
+        custo_producao_mes=round(custo_producao_mes, 2),
+        producao_funcionarios_list=producao_funcionarios_list,
         lucro_mes=round(lucro_mes, 2),
         total_fardos_saida=total_fardos_saida,
         total_fardos_entrada=total_fardos_entrada,
@@ -430,11 +517,64 @@ def dashboard():
     )
 
 
+def dashboard_producao():
+    """Dashboard simplificado para os funcionários que enfardam (Clare, Gabriel, etc)."""
+    hoje = date.today()
+    ano = int(request.args.get("ano", hoje.year))
+    mes = int(request.args.get("mes", hoje.month))
+    primeiro_dia, ultimo_dia = month_bounds(ano, mes)
+    taxas = get_taxa_producao()
+
+    db = Session()
+    registros_mes = db.query(Producao).filter(
+        Producao.usuario == session["username"],
+        Producao.data >= primeiro_dia.isoformat(), Producao.data <= ultimo_dia.isoformat()
+    ).all()
+
+    total_fardos = sum(r.qtd_fardos for r in registros_mes)
+    total_ganho = sum(r.qtd_fardos * taxa_producao(r.cm, taxas) for r in registros_mes)
+
+    dias_no_mes = (ultimo_dia - primeiro_dia).days + 1
+    dias_considerados = hoje.day if (ano == hoje.year and mes == hoje.month) else dias_no_mes
+    media_diaria_fardos = total_fardos / dias_considerados if dias_considerados else 0
+
+    dias_labels, dias_fardos = [], []
+    por_dia = {}
+    for r in registros_mes:
+        por_dia.setdefault(r.data, []).append(r)
+    cursor_dia = primeiro_dia
+    while cursor_dia <= min(ultimo_dia, hoje if (ano == hoje.year and mes == hoje.month) else ultimo_dia):
+        iso = cursor_dia.isoformat()
+        dias_labels.append(cursor_dia.strftime("%d/%m"))
+        dias_fardos.append(sum(r.qtd_fardos for r in por_dia.get(iso, [])))
+        cursor_dia += timedelta(days=1)
+
+    breakdown = {}
+    for r in registros_mes:
+        breakdown.setdefault(r.cm, {"fardos": 0, "valor": 0.0})
+        breakdown[r.cm]["fardos"] += r.qtd_fardos
+        breakdown[r.cm]["valor"] += r.qtd_fardos * taxa_producao(r.cm, taxas)
+    breakdown_list = [{"cm": cm, "fardos": v["fardos"], "valor": round(v["valor"], 2)}
+                       for cm, v in sorted(breakdown.items())]
+
+    meses_nomes = ["", "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+                   "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
+
+    return render_template(
+        "dashboard_producao.html",
+        ano=ano, mes=mes, mes_nome=meses_nomes[mes], hoje=hoje,
+        total_fardos=total_fardos, total_ganho=round(total_ganho, 2),
+        media_diaria_fardos=round(media_diaria_fardos, 1),
+        dias_labels=dias_labels, dias_fardos=dias_fardos,
+        breakdown_list=breakdown_list,
+    )
+
+
 # ---------------------------------------------------------------------------
 # ENTRADAS (fardos recebidos)
 # ---------------------------------------------------------------------------
 @app.route("/entradas", methods=["GET", "POST"])
-@login_required
+@role_required("admin", "texpharma", "funcionario")
 def entradas():
     db = Session()
     if request.method == "POST":
@@ -459,7 +599,7 @@ def entradas():
 
 
 @app.route("/entradas/foto/<int:id>")
-@login_required
+@role_required("admin", "texpharma", "funcionario")
 def foto_entrada(id):
     db = Session()
     reg = db.query(Entrada).get(id)
@@ -518,7 +658,7 @@ def editar_entrada(id):
 # SAÍDAS (fardos entregues / produzidos)
 # ---------------------------------------------------------------------------
 @app.route("/saidas", methods=["GET", "POST"])
-@login_required
+@role_required("admin", "texpharma", "funcionario")
 def saidas():
     db = Session()
     if request.method == "POST":
@@ -544,7 +684,7 @@ def saidas():
 
 
 @app.route("/saidas/foto/<int:id>")
-@login_required
+@role_required("admin", "texpharma", "funcionario")
 def foto_saida(id):
     db = Session()
     reg = db.query(Saida).get(id)
@@ -597,6 +737,112 @@ def editar_saida(id):
                             voltar_url=url_for("saidas"), salvar_url=url_for("editar_saida", id=id),
                             foto_url=url_for("foto_saida", id=id) if reg.foto_data else None,
                             titulo="Editar saída")
+
+
+# ---------------------------------------------------------------------------
+# PRODUÇÃO (funcionários que enfardam — Clare, Gabriel, etc)
+# ---------------------------------------------------------------------------
+@app.route("/producao", methods=["GET", "POST"])
+@role_required("producao")
+def producao():
+    db = Session()
+    if request.method == "POST":
+        foto_bytes, foto_mime = processar_foto(request.files.get("foto"))
+        if not foto_bytes:
+            flash("É obrigatório anexar uma foto do que foi produzido.", "error")
+            return redirect(url_for("producao"))
+        data_reg = request.form.get("data") or date.today().isoformat()
+        cm = int(request.form.get("cm"))
+        fornecedor = request.form.get("fornecedor", "texpharma")
+        qtd = int(request.form.get("qtd_fardos"))
+        obs = request.form.get("obs", "")
+        db.add(Producao(data=data_reg, cm=cm, fornecedor=fornecedor, qtd_fardos=qtd, obs=obs,
+                         foto_data=foto_bytes, foto_mimetype=foto_mime, usuario=session["username"]))
+        db.commit()
+        flash("Produção registrada com sucesso!", "success")
+        return redirect(url_for("producao"))
+
+    registros = db.query(Producao).filter_by(usuario=session["username"]) \
+        .order_by(Producao.data.desc(), Producao.id.desc()).limit(200).all()
+    cms = sorted({r.cm for r in db.query(CmConfig).all()})
+    return render_template("producao.html", registros=registros, cms=cms, fornecedores=FORNECEDORES)
+
+
+@app.route("/producao/foto/<int:id>")
+@login_required
+def foto_producao(id):
+    if session.get("role") not in ("admin", "producao"):
+        abort(403)
+    db = Session()
+    reg = db.query(Producao).get(id)
+    if not reg or not reg.foto_data:
+        abort(404)
+    if session.get("role") == "producao" and reg.usuario != session.get("username"):
+        abort(403)
+    return send_file(BytesIO(reg.foto_data), mimetype=reg.foto_mimetype or "image/jpeg")
+
+
+@app.route("/producao/todas")
+@role_required("admin")
+def producao_admin():
+    db = Session()
+    hoje = date.today()
+    ano = int(request.args.get("ano", hoje.year))
+    mes = int(request.args.get("mes", hoje.month))
+    primeiro_dia, ultimo_dia = month_bounds(ano, mes)
+    taxas = get_taxa_producao()
+
+    registros = db.query(Producao).filter(
+        Producao.data >= primeiro_dia.isoformat(), Producao.data <= ultimo_dia.isoformat()
+    ).order_by(Producao.data.desc(), Producao.id.desc()).all()
+
+    meses_nomes = ["", "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+                   "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
+
+    return render_template("producao_admin.html", registros=registros, taxas=taxas,
+                            ano=ano, mes=mes, mes_nome=meses_nomes[mes], hoje=hoje)
+
+
+@app.route("/producao/excluir/<int:id>", methods=["POST"])
+@role_required("admin")
+def excluir_producao(id):
+    db = Session()
+    reg = db.query(Producao).get(id)
+    if reg:
+        db.delete(reg)
+        db.commit()
+    flash("Registro de produção excluído.", "success")
+    return redirect(url_for("producao_admin"))
+
+
+@app.route("/producao/editar/<int:id>", methods=["GET", "POST"])
+@role_required("admin")
+def editar_producao(id):
+    db = Session()
+    reg = db.query(Producao).get(id)
+    if not reg:
+        flash("Registro não encontrado.", "error")
+        return redirect(url_for("producao_admin"))
+
+    if request.method == "POST":
+        reg.data = request.form.get("data") or reg.data
+        reg.cm = int(request.form.get("cm"))
+        reg.fornecedor = request.form.get("fornecedor", "texpharma")
+        reg.qtd_fardos = int(request.form.get("qtd_fardos"))
+        reg.obs = request.form.get("obs", "")
+        foto_bytes, foto_mime = processar_foto(request.files.get("foto"))
+        if foto_bytes:
+            reg.foto_data = foto_bytes
+            reg.foto_mimetype = foto_mime
+        db.commit()
+        flash("Produção atualizada com sucesso!", "success")
+        return redirect(url_for("producao_admin"))
+
+    cms = sorted({r.cm for r in db.query(CmConfig).all()})
+    return render_template("editar_registro.html", registro=reg, cms=cms, fornecedores=FORNECEDORES,
+                            voltar_url=url_for("producao_admin"), salvar_url=url_for("editar_producao", id=id),
+                            foto_url=url_for("foto_producao", id=id) if reg.foto_data else None,
+                            titulo=f"Editar produção de {reg.usuario}", foto_obrigatoria=True)
 
 
 # ---------------------------------------------------------------------------
@@ -666,7 +912,23 @@ def configuracoes():
 
     configs_texpharma = db.query(CmConfig).filter_by(fornecedor="texpharma").order_by(CmConfig.cm).all()
     configs_leticia = db.query(CmConfig).filter_by(fornecedor="leticia").order_by(CmConfig.cm).all()
-    return render_template("configuracoes.html", configs_texpharma=configs_texpharma, configs_leticia=configs_leticia)
+    taxas_producao = db.query(TaxaProducao).order_by(TaxaProducao.cm).all()
+    return render_template("configuracoes.html", configs_texpharma=configs_texpharma,
+                            configs_leticia=configs_leticia, taxas_producao=taxas_producao)
+
+
+@app.route("/configuracoes/taxa-producao", methods=["POST"])
+@role_required("admin")
+def salvar_taxa_producao():
+    db = Session()
+    taxa_id = int(request.form.get("id"))
+    valor = float(request.form.get("valor_por_fardo"))
+    t = db.query(TaxaProducao).get(taxa_id)
+    if t:
+        t.valor_por_fardo = valor
+        db.commit()
+    flash("Taxa de produção atualizada.", "success")
+    return redirect(url_for("configuracoes"))
 
 
 # ---------------------------------------------------------------------------
@@ -792,7 +1054,14 @@ def gerar_relatorio():
         despesas = db.query(Despesa).filter(
             Despesa.data >= inicio.isoformat(), Despesa.data <= fim.isoformat()
         ).all()
-        total_despesas = sum(d.valor for d in despesas)
+        total_despesas_lancadas = sum(d.valor for d in despesas)
+
+        taxas = get_taxa_producao()
+        producoes = db.query(Producao).filter(
+            Producao.data >= inicio.isoformat(), Producao.data <= fim.isoformat()
+        ).all()
+        custo_producao = sum(p.qtd_fardos * taxa_producao(p.cm, taxas) for p in producoes)
+        total_despesas = total_despesas_lancadas + custo_producao
         lucro = faturamento - total_despesas
 
         def fmt(v):
@@ -801,12 +1070,30 @@ def gerar_relatorio():
         resumo_data = [["Indicador", "Valor"],
                         ["Faturamento (fardos entregues)", fmt(faturamento)],
                         ["Total de dúzias produzidas", str(total_sacos)],
-                        ["Despesas no período", fmt(total_despesas)],
+                        ["Despesas lançadas manualmente", fmt(total_despesas_lancadas)],
+                        ["Custo de produção (funcionários)", fmt(custo_producao)],
+                        ["Despesas totais", fmt(total_despesas)],
                         ["Lucro no período", fmt(lucro)]]
         t = Table(resumo_data, colWidths=[10 * cm, 6 * cm])
         t.setStyle(header_style)
         story.append(t)
         story.append(Spacer(1, 18))
+
+        if producoes:
+            story.append(Paragraph("Produção por funcionário", styles["Heading3"]))
+            story.append(Spacer(1, 6))
+            por_func = {}
+            for p in producoes:
+                por_func.setdefault(p.usuario, {"fardos": 0, "valor": 0.0})
+                por_func[p.usuario]["fardos"] += p.qtd_fardos
+                por_func[p.usuario]["valor"] += p.qtd_fardos * taxa_producao(p.cm, taxas)
+            func_data = [["Funcionário", "Fardos produzidos", "Valor a pagar"]]
+            for u, v in sorted(por_func.items()):
+                func_data.append([u, str(v["fardos"]), fmt(v["valor"])])
+            t3 = Table(func_data, colWidths=[6 * cm, 5 * cm, 5 * cm])
+            t3.setStyle(header_style)
+            story.append(t3)
+            story.append(Spacer(1, 18))
 
         story.append(Paragraph("Detalhamento por espessura e fornecedor", styles["Heading3"]))
         story.append(Spacer(1, 6))

@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+
+<div class="page-header">
+    <h1>Meu Dashboard</h1>
+    <form class="month-filter" method="GET">
+        <select name="mes">
+            {% for i, nome in [(1,'Janeiro'),(2,'Fevereiro'),(3,'Março'),(4,'Abril'),(5,'Maio'),(6,'Junho'),(7,'Julho'),(8,'Agosto'),(9,'Setembro'),(10,'Outubro'),(11,'Novembro'),(12,'Dezembro')] %}
+                <option value="{{ i }}" {{ 'selected' if i == mes }}>{{ nome }}</option>
+            {% endfor %}
+        </select>
+        <select name="ano">
+            {% for a in range(hoje.year - 2, hoje.year + 1) %}
+                <option value="{{ a }}" {{ 'selected' if a == ano }}>{{ a }}</option>
+            {% endfor %}
+        </select>
+        <button type="submit">Filtrar</button>
+    </form>
+</div>
+
+<p class="period-label">Exibindo dados de <b>{{ mes_nome }} / {{ ano }}</b></p>
+
+<div class="kpi-grid">
+    <div class="kpi-card kpi-purple">
+        <span class="kpi-label">Fardos produzidos</span>
+        <span class="kpi-value">{{ total_fardos }}</span>
+    </div>
+    <div class="kpi-card kpi-green">
+        <span class="kpi-label">Você ganhou</span>
+        <span class="kpi-value">R$ {{ "%.2f"|format(total_ganho)|replace(".", ",") }}</span>
+    </div>
+    <div class="kpi-card kpi-blue">
+        <span class="kpi-label">Média diária</span>
+        <span class="kpi-value">{{ media_diaria_fardos }} fardos/dia</span>
+    </div>
+</div>
+
+<div class="charts-grid">
+    <div class="chart-card">
+        <h3>Fardos produzidos por dia</h3>
+        <div class="chart-wrap"><canvas id="chartFardosProducao"></canvas></div>
+    </div>
+</div>
+
+<div class="table-card">
+    <h3>Resumo por espessura no mês</h3>
+    <div class="table-scroll">
+    <table>
+        <thead><tr><th>Espessura</th><th>Fardos produzidos</th><th>Valor recebido</th></tr></thead>
+        <tbody>
+            {% for item in breakdown_list %}
+            <tr>
+                <td>{{ item.cm }} cm</td>
+                <td>{{ item.fardos }}</td>
+                <td>R$ {{ "%.2f"|format(item.valor)|replace(".", ",") }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="3" class="empty">Nenhuma produção lançada neste mês.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script>
+new Chart(document.getElementById('chartFardosProducao'), {
+    type: 'bar',
+    data: {
+        labels: {{ dias_labels|tojson }},
+        datasets: [{
+            label: 'Fardos produzidos',
+            data: {{ dias_fardos|tojson }},
+            backgroundColor: '#8b5cf6'
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true } }
+    }
+});
+</script>
+{% endblock %}
