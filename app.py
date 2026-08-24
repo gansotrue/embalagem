@@ -50,10 +50,10 @@ class CmConfig(Base):
     id = Column(Integer, primary_key=True)
     cm = Column(Integer, nullable=False)
     fornecedor = Column(String(20), nullable=False, default="texpharma")
+    tipo = Column(String(10), nullable=False, default="fardo")
     sacos_por_fardo = Column(Integer, nullable=False, default=0)
     valor_pacote = Column(Float, nullable=False, default=0.15)
     valor_fardo = Column(Float, nullable=False, default=0)
-
 
 class TaxaProducao(Base):
     """Quanto se paga a um funcionário de produção por fardo enfardado, por espessura."""
@@ -81,6 +81,7 @@ class Saida(Base):
     data = Column(String(10), nullable=False)
     cm = Column(Integer, nullable=False)
     fornecedor = Column(String(20), nullable=False, default="texpharma")
+    tipo = Column(String(10), nullable=False, default="fardo")
     qtd_fardos = Column(Integer, nullable=False)
     obs = Column(String(255))
     foto_data = Column(LargeBinary)
@@ -123,12 +124,16 @@ def run_migrations():
             if "must_change_password" not in cols:
                 conn.execute(text("ALTER TABLE users ADD COLUMN must_change_password BOOLEAN DEFAULT FALSE"))
 
-        if insp.has_table("cm_config"):
-            cols = [c["name"] for c in insp.get_columns("cm_config")]
+                if insp.has_table("cm_config"):
+                    cols = [c["name"] for c in insp.get_columns("cm_config")]
+
             if "fornecedor" not in cols:
-                # schema antigo (sem fornecedor/id) — a tabela é só configuração de preço,
-                # fácil de reconfigurar, então recriamos do zero com o schema novo.
                 conn.execute(text("DROP TABLE cm_config"))
+            else:
+                if "tipo" not in cols:
+                    conn.execute(
+                        text("ALTER TABLE cm_config ADD COLUMN tipo VARCHAR(10) DEFAULT 'fardo'")
+                    )
 
         if insp.has_table("entradas"):
             cols = [c["name"] for c in insp.get_columns("entradas")]
@@ -141,11 +146,16 @@ def run_migrations():
         if insp.has_table("saidas"):
             cols = [c["name"] for c in insp.get_columns("saidas")]
             if "fornecedor" not in cols:
-                conn.execute(text("ALTER TABLE saidas ADD COLUMN fornecedor VARCHAR(20) DEFAULT 'texpharma'"))
+                conn.execute(
+                text("ALTER TABLE saidas ADD COLUMN fornecedor VARCHAR(20) DEFAULT 'texpharma'"))
+            if "tipo" not in cols:
+                conn.execute(
+                text("ALTER TABLE saidas ADD COLUMN tipo VARCHAR(10) DEFAULT 'fardo'"))
             if "foto_data" not in cols:
-                conn.execute(text(f"ALTER TABLE saidas ADD COLUMN foto_data {tipo_binario}"))
-                conn.execute(text("ALTER TABLE saidas ADD COLUMN foto_mimetype VARCHAR(50)"))
-
+                conn.execute(
+                text(f"ALTER TABLE saidas ADD COLUMN foto_data {tipo_binario}"))
+                conn.execute(
+                text("ALTER TABLE saidas ADD COLUMN foto_mimetype VARCHAR(50)"))
 
 def init_db():
     run_migrations()
@@ -315,22 +325,36 @@ def trocar_senha():
 # ---------------------------------------------------------------------------
 def get_cm_config():
     db = Session()
-    rows = db.query(CmConfig).order_by(CmConfig.fornecedor, CmConfig.cm).all()
-    return {(row.cm, row.fornecedor): {
-        "cm": row.cm, "fornecedor": row.fornecedor, "sacos_por_fardo": row.sacos_por_fardo,
-        "valor_pacote": row.valor_pacote, "valor_fardo": row.valor_fardo
-    } for row in rows}
+
+    rows = db.query(CmConfig).order_by(
+        CmConfig.fornecedor,
+        CmConfig.tipo,
+        CmConfig.cm
+    ).all()
+
+    return {
+        (row.tipo, row.cm, row.fornecedor): {
+            "id": row.id,
+            "cm": row.cm,
+            "fornecedor": row.fornecedor,
+            "tipo": row.tipo,
+            "sacos_por_fardo": row.sacos_por_fardo,
+            "valor_pacote": row.valor_pacote,
+            "valor_fardo": row.valor_fardo
+        }
+        for row in rows
+    }
 
 
-def valor_fardo(cm, fornecedor, config=None):
+def valor_fardo(cm, fornecedor, config=None, tipo="fardo"):
     config = config or get_cm_config()
-    c = config.get((cm, fornecedor))
+    c = config.get((tipo, cm, fornecedor))
     return c["valor_fardo"] if c else 0
 
 
-def sacos_por_fardo(cm, fornecedor, config=None):
+def sacos_por_fardo(cm, fornecedor, config=None, tipo="fardo"):
     config = config or get_cm_config()
-    c = config.get((cm, fornecedor))
+    c = config.get((tipo, cm, fornecedor))
     return c["sacos_por_fardo"] if c else 0
 
 
@@ -661,26 +685,89 @@ def editar_entrada(id):
 @role_required("admin", "texpharma", "funcionario")
 def saidas():
     db = Session()
+
     if request.method == "POST":
         if not pode_lancar():
             flash("Você não tem permissão para adicionar registros.", "error")
             return redirect(url_for("saidas"))
+
         data_reg = request.form.get("data") or date.today().isoformat()
+
+        tipo = request.form.get("tipo", "fardo")
+
+        if tipo not in ("fardo", "caixa"):
+            flash("Tipo de saída inválido.", "error")
+            return redirect(url_for("saidas"))
+
         cm = int(request.form.get("cm"))
-        fornecedor = request.form.get("fornecedor", "texpharma")
+
+        fornecedor = request.form.get(
+            "fornecedor",
+            "texpharma"
+        )
+
         qtd = int(request.form.get("qtd_fardos"))
+
         obs = request.form.get("obs", "")
-        foto_bytes, foto_mime = processar_foto(request.files.get("foto"))
-        db.add(Saida(data=data_reg, cm=cm, fornecedor=fornecedor, qtd_fardos=qtd, obs=obs,
-                      foto_data=foto_bytes, foto_mimetype=foto_mime))
+
+        # Confirma que existe configuração para essa combinação
+        config = db.query(CmConfig).filter_by(
+            tipo=tipo,
+            cm=cm,
+            fornecedor=fornecedor
+        ).first()
+
+        if not config:
+            flash(
+                f"Não existe configuração para {tipo} de {cm} cm para esse fornecedor.",
+                "error"
+            )
+            return redirect(url_for("saidas"))
+
+        foto_bytes, foto_mime = processar_foto(
+            request.files.get("foto")
+        )
+
+        db.add(
+            Saida(
+                data=data_reg,
+                cm=cm,
+                fornecedor=fornecedor,
+                tipo=tipo,
+                qtd_fardos=qtd,
+                obs=obs,
+                foto_data=foto_bytes,
+                foto_mimetype=foto_mime
+            )
+        )
+
         db.commit()
+
         flash("Saída registrada com sucesso!", "success")
+
         return redirect(url_for("saidas"))
 
-    registros = db.query(Saida).order_by(Saida.data.desc(), Saida.id.desc()).limit(200).all()
-    cms = sorted({r.cm for r in db.query(CmConfig).all()})
+    registros = db.query(Saida).order_by(
+        Saida.data.desc(),
+        Saida.id.desc()
+    ).limit(200).all()
+
     config_map = get_cm_config()
-    return render_template("saidas.html", registros=registros, cms=cms, fornecedores=FORNECEDORES, config_map=config_map)
+
+    # Opções existentes separadas por tipo
+    configuracoes = db.query(CmConfig).order_by(
+        CmConfig.fornecedor,
+        CmConfig.tipo,
+        CmConfig.cm
+    ).all()
+
+    return render_template(
+        "saidas.html",
+        registros=registros,
+        fornecedores=FORNECEDORES,
+        config_map=config_map,
+        configuracoes=configuracoes
+    )
 
 
 @app.route("/saidas/foto/<int:id>")
@@ -884,37 +971,93 @@ def excluir_despesa(id):
 @role_required("admin")
 def configuracoes():
     db = Session()
+
     if request.method == "POST":
         cfg_id = int(request.form.get("id"))
-        sacos_por_fardo = int(request.form.get("sacos_por_fardo"))
-        valor_pacote = float(request.form.get("valor_pacote"))
-        valor_fardo_calc = round(sacos_por_fardo * valor_pacote, 2)
+
+        sacos = int(request.form.get("sacos_por_fardo", 0))
+        valor_pacote = float(request.form.get("valor_pacote", 0))
+
         cfg = db.query(CmConfig).get(cfg_id)
+
         if cfg:
-            cfg.sacos_por_fardo = sacos_por_fardo
+            cfg.sacos_por_fardo = sacos
             cfg.valor_pacote = valor_pacote
-            cfg.valor_fardo = valor_fardo_calc
+            cfg.valor_fardo = round(sacos * valor_pacote, 2)
+
             db.commit()
+
         flash("Configuração atualizada.", "success")
         return redirect(url_for("configuracoes"))
 
     novo_cm = request.args.get("novo_cm")
     novo_fornecedor = request.args.get("novo_fornecedor")
+    novo_tipo = request.args.get("novo_tipo", "fardo")
+
     if novo_cm and novo_fornecedor in FORNECEDORES:
         try:
             novo_cm = int(novo_cm)
-            if not db.query(CmConfig).filter_by(cm=novo_cm, fornecedor=novo_fornecedor).first():
-                db.add(CmConfig(cm=novo_cm, fornecedor=novo_fornecedor, sacos_por_fardo=0,
-                                 valor_pacote=0.15, valor_fardo=0))
+
+            if novo_tipo not in ("fardo", "caixa"):
+                novo_tipo = "fardo"
+
+            existe = db.query(CmConfig).filter_by(
+                cm=novo_cm,
+                fornecedor=novo_fornecedor,
+                tipo=novo_tipo
+            ).first()
+
+            if not existe:
+                db.add(
+                    CmConfig(
+                        cm=novo_cm,
+                        fornecedor=novo_fornecedor,
+                        tipo=novo_tipo,
+                        sacos_por_fardo=0,
+                        valor_pacote=0.15,
+                        valor_fardo=0
+                    )
+                )
                 db.commit()
+
         except ValueError:
             pass
 
-    configs_texpharma = db.query(CmConfig).filter_by(fornecedor="texpharma").order_by(CmConfig.cm).all()
-    configs_leticia = db.query(CmConfig).filter_by(fornecedor="leticia").order_by(CmConfig.cm).all()
-    taxas_producao = db.query(TaxaProducao).order_by(TaxaProducao.cm).all()
-    return render_template("configuracoes.html", configs_texpharma=configs_texpharma,
-                            configs_leticia=configs_leticia, taxas_producao=taxas_producao)
+    configs_texpharma_fardos = db.query(CmConfig).filter_by(
+        fornecedor="texpharma",
+        tipo="fardo"
+    ).order_by(CmConfig.cm).all()
+
+    configs_texpharma_caixas = db.query(CmConfig).filter_by(
+        fornecedor="texpharma",
+        tipo="caixa"
+    ).order_by(CmConfig.cm).all()
+
+    configs_leticia_fardos = db.query(CmConfig).filter_by(
+        fornecedor="leticia",
+        tipo="fardo"
+    ).order_by(CmConfig.cm).all()
+
+    configs_leticia_caixas = db.query(CmConfig).filter_by(
+        fornecedor="leticia",
+        tipo="caixa"
+    ).order_by(CmConfig.cm).all()
+
+    taxas_producao = db.query(TaxaProducao).order_by(
+        TaxaProducao.cm
+    ).all()
+
+    return render_template(
+        "configuracoes.html",
+
+        configs_texpharma_fardos=configs_texpharma_fardos,
+        configs_texpharma_caixas=configs_texpharma_caixas,
+
+        configs_leticia_fardos=configs_leticia_fardos,
+        configs_leticia_caixas=configs_leticia_caixas,
+
+        taxas_producao=taxas_producao
+    )
 
 
 @app.route("/configuracoes/taxa-producao", methods=["POST"])
