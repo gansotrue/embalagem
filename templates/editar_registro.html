@@ -28,14 +28,12 @@
         <label>Observação (opcional)</label>
         <input type="text" name="obs" value="{{ registro.obs or '' }}">
 
-        <label>Foto{% if foto_obrigatoria %} (obrigatória){% endif %}</label>
+        <label>Foto</label>
         {% if foto_url %}
         <div class="foto-atual">
             <img src="{{ foto_url }}" class="foto-preview" alt="Foto atual">
         </div>
-        {% if not foto_obrigatoria %}
         <label class="radio-option" style="margin-top:6px;"><input type="checkbox" name="remover_foto" value="1"> Remover foto atual</label>
-        {% endif %}
         <p class="hint-block" style="margin:4px 0 0;">Ou envie uma nova foto abaixo para substituir:</p>
         {% endif %}
         <input type="file" name="foto" accept="image/*" capture="environment">

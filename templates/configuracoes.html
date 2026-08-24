@@ -1,307 +1,72 @@
 {% extends "base.html" %}
-
 {% block title %}Configurações{% endblock %}
-
 {% block content %}
-
-<div class="page-header">
-    <h1>Configurações</h1>
-</div>
+<div class="page-header"><h1>⚙️ Configuração de valores por espessura e fornecedor</h1></div>
 
 <p class="hint-block">
-    Configure separadamente caixas e fardos. Cada tipo pode possuir
-    espessuras, quantidades e valores diferentes.
+    Para cada fornecedor e espessura, defina quantos sacos (pacotes de 12 unidades) cabem em um fardo
+    e quanto você recebe por pacote. O valor do fardo é calculado automaticamente.
 </p>
 
-
-{% macro tabela_config(titulo, configs) %}
-
 <div class="table-card">
-
-    <h3>{{ titulo }}</h3>
-
+    <h3>Texpharma</h3>
     <table>
-
         <thead>
-
-            <tr>
-                <th>Espessura</th>
-                <th>Sacos por unidade</th>
-                <th>Valor por pacote (R$)</th>
-                <th>Valor total (R$)</th>
-                <th></th>
-            </tr>
-
+            <tr><th>Espessura</th><th>Sacos por fardo</th><th>Valor por pacote (R$)</th><th>Valor do fardo (R$)</th><th></th></tr>
         </thead>
-
         <tbody>
-
-        {% for c in configs %}
-
+        {% for c in configs_texpharma %}
             <tr>
-
                 <form method="POST">
-
-                    <td>
-
-                        {{ c.cm }} cm
-
-                        <input type="hidden"
-                               name="id"
-                               value="{{ c.id }}">
-
-                    </td>
-
-                    <td>
-
-                        <input type="number"
-                               name="sacos_por_fardo"
-                               value="{{ c.sacos_por_fardo }}"
-                               min="0"
-                               required>
-
-                    </td>
-
-                    <td>
-
-                        <input type="number"
-                               step="0.01"
-                               name="valor_pacote"
-                               value="{{ c.valor_pacote }}"
-                               min="0"
-                               required>
-
-                    </td>
-
-                    <td>
-
-                        R$
-                        {{ "%.2f"|format(
-                            c.valor_fardo
-                        )|replace(".", ",") }}
-
-                    </td>
-
-                    <td>
-
-                        <button type="submit">
-                            Salvar
-                        </button>
-
-                    </td>
-
+                    <td>{{ c.cm }} cm <input type="hidden" name="id" value="{{ c.id }}"></td>
+                    <td><input type="number" name="sacos_por_fardo" value="{{ c.sacos_por_fardo }}" min="0" required></td>
+                    <td><input type="number" step="0.01" name="valor_pacote" value="{{ c.valor_pacote }}" min="0" required></td>
+                    <td>R$ {{ "%.2f"|format(c.valor_fardo)|replace(".", ",") }}</td>
+                    <td><button type="submit">Salvar</button></td>
                 </form>
-
             </tr>
-
-        {% else %}
-
-            <tr>
-
-                <td colspan="5"
-                    class="empty">
-
-                    Nenhuma configuração cadastrada.
-
-                </td>
-
-            </tr>
-
         {% endfor %}
-
         </tbody>
-
     </table>
-
 </div>
 
-{% endmacro %}
-
-
-{{ tabela_config(
-    "Texpharma — Fardos",
-    configs_texpharma_fardos
-) }}
-
-{{ tabela_config(
-    "Texpharma — Caixas",
-    configs_texpharma_caixas
-) }}
-
-{{ tabela_config(
-    "Letícia — Fardos",
-    configs_leticia_fardos
-) }}
-
-{{ tabela_config(
-    "Letícia — Caixas",
-    configs_leticia_caixas
-) }}
-
+<div class="table-card">
+    <h3>Letícia</h3>
+    <table>
+        <thead>
+            <tr><th>Espessura</th><th>Sacos por fardo</th><th>Valor por pacote (R$)</th><th>Valor do fardo (R$)</th><th></th></tr>
+        </thead>
+        <tbody>
+        {% for c in configs_leticia %}
+            <tr>
+                <form method="POST">
+                    <td>{{ c.cm }} cm <input type="hidden" name="id" value="{{ c.id }}"></td>
+                    <td><input type="number" name="sacos_por_fardo" value="{{ c.sacos_por_fardo }}" min="0" required></td>
+                    <td><input type="number" step="0.01" name="valor_pacote" value="{{ c.valor_pacote }}" min="0" required></td>
+                    <td>R$ {{ "%.2f"|format(c.valor_fardo)|replace(".", ",") }}</td>
+                    <td><button type="submit">Salvar</button></td>
+                </form>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
 
 <div class="form-card">
-
-    <h3>Adicionar nova configuração</h3>
-
-    <form method="GET"
-          class="inline-form">
-
+    <h3>Adicionar nova espessura</h3>
+    <form method="GET" class="inline-form">
         <div>
-
-            <label>Tipo</label>
-
-            <div class="radio-group">
-
-                <label class="radio-option">
-
-                    <input type="radio"
-                           name="novo_tipo"
-                           value="fardo"
-                           checked>
-
-                    Fardo
-
-                </label>
-
-                <label class="radio-option">
-
-                    <input type="radio"
-                           name="novo_tipo"
-                           value="caixa">
-
-                    Caixa
-
-                </label>
-
-            </div>
-
-        </div>
-
-
-        <div>
-
             <label>Espessura (cm)</label>
-
-            <input type="number"
-                   name="novo_cm"
-                   min="1"
-                   required>
-
+            <input type="number" name="novo_cm" min="1" required>
         </div>
-
-
         <div>
-
             <label>Fornecedor</label>
-
             <div class="radio-group">
-
-                <label class="radio-option">
-
-                    <input type="radio"
-                           name="novo_fornecedor"
-                           value="texpharma"
-                           checked>
-
-                    Texpharma
-
-                </label>
-
-                <label class="radio-option">
-
-                    <input type="radio"
-                           name="novo_fornecedor"
-                           value="leticia">
-
-                    Letícia
-
-                </label>
-
+                <label class="radio-option"><input type="radio" name="novo_fornecedor" value="texpharma" checked> Texpharma</label>
+                <label class="radio-option"><input type="radio" name="novo_fornecedor" value="leticia"> Letícia</label>
             </div>
-
         </div>
-
-
-        <button type="submit">
-            Adicionar
-        </button>
-
+        <button type="submit">Adicionar</button>
     </form>
-
 </div>
-
-
-<div class="table-card">
-
-    <h3>
-        Taxa paga aos funcionários de produção
-    </h3>
-
-    <p class="hint-block">
-        A taxa de produção continua sendo configurada por fardo,
-        independentemente do fornecedor.
-    </p>
-
-    <table>
-
-        <thead>
-
-            <tr>
-                <th>Espessura</th>
-                <th>Valor por fardo (R$)</th>
-                <th></th>
-            </tr>
-
-        </thead>
-
-        <tbody>
-
-        {% for t in taxas_producao %}
-
-            <tr>
-
-                <form method="POST"
-                      action="{{ url_for('salvar_taxa_producao') }}">
-
-                    <td>
-
-                        {{ t.cm }} cm
-
-                        <input type="hidden"
-                               name="id"
-                               value="{{ t.id }}">
-
-                    </td>
-
-                    <td>
-
-                        <input type="number"
-                               step="0.01"
-                               name="valor_por_fardo"
-                               value="{{ t.valor_por_fardo }}"
-                               min="0"
-                               required>
-
-                    </td>
-
-                    <td>
-
-                        <button type="submit">
-                            Salvar
-                        </button>
-
-                    </td>
-
-                </form>
-
-            </tr>
-
-        {% endfor %}
-
-        </tbody>
-
-    </table>
-
-</div>
-
 {% endblock %}

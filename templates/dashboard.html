@@ -30,9 +30,6 @@
     <div class="kpi-card kpi-red">
         <span class="kpi-label">Despesas do mês</span>
         <span class="kpi-value">R$ {{ "%.2f"|format(total_despesas)|replace(".", ",") }}</span>
-        {% if custo_producao_mes > 0 %}
-        <span class="kpi-sub">inclui R$ {{ "%.2f"|format(custo_producao_mes)|replace(".", ",") }} de mão de obra</span>
-        {% endif %}
     </div>
     <div class="kpi-card kpi-green">
         <span class="kpi-label">Lucro do mês</span>
@@ -114,27 +111,6 @@
     </table>
     </div>
 </div>
-
-{% if is_admin() and producao_funcionarios_list %}
-<div class="table-card">
-    <h3>Produção por funcionário no mês <small class="hint-inline">(vira despesa automaticamente no seu lucro)</small></h3>
-    <div class="table-scroll">
-    <table>
-        <thead><tr><th>Funcionário</th><th>Fardos produzidos</th><th>Valor a pagar</th></tr></thead>
-        <tbody>
-            {% for item in producao_funcionarios_list %}
-            <tr>
-                <td>{{ item.usuario }}</td>
-                <td>{{ item.fardos }}</td>
-                <td>R$ {{ "%.2f"|format(item.valor)|replace(".", ",") }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    </div>
-    <p class="hint-block" style="margin:12px 0 0;">Veja fotos e detalhes de cada lançamento em <a href="{{ url_for('producao_admin') }}">Produção (funcionários)</a>.</p>
-</div>
-{% endif %}
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script>
